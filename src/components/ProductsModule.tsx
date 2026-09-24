@@ -2,7 +2,11 @@ import React, { useState } from 'react';
 import { Product } from '../types';
 import { LocalData } from '../lib/storage';
 import { BarcodeScannerModal } from './BarcodeScannerModal';
-import { Package, Plus, Scan, Search, ExternalLink, Image as ImageIcon, CheckCircle2 } from 'lucide-react';
+import { fetchProductByBarcode } from '../services/openFoodFactsService';
+import {
+  Package, Plus, Scan, Search, Image as ImageIcon,
+  CheckCircle2, AlertCircle, Loader2
+} from 'lucide-react';
 
 export const ProductsModule: React.FC = () => {
   const [products, setProducts] = useState<Product[]>(LocalData.getProducts());
@@ -13,7 +17,7 @@ export const ProductsModule: React.FC = () => {
   const [showProductModal, setShowProductModal] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
   const [isLoadingApi, setIsLoadingApi] = useState(false);
-  const [apiMessage, setApiMessage] = useState<string | null>(null);
+  const [apiMessage, setApiMessage] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
 
   // Form Fields
   const [name, setName] = useState('');
@@ -23,35 +27,39 @@ export const ProductsModule: React.FC = () => {
   const [unit, setUnit] = useState('un');
   const [imageUrl, setImageUrl] = useState('');
 
+  // Image load error state tracker for fallback rendering
+  const [failedImageIds, setFailedImageIds] = useState<Set<string>>(new Set());
+
   const categories = ['Todas', 'Laticínios', 'Mercearia', 'Padaria', 'Higiene', 'Limpeza', 'Hortifruti', 'Bebidas', 'Outros'];
+
+  const lookupBarcode = async (codeToLookup: string) => {
+    if (!codeToLookup.trim()) return;
+
+    setIsLoadingApi(true);
+    setApiMessage({ text: 'Buscando na base pública Open Food Facts v3...', type: 'info' });
+
+    const response = await fetchProductByBarcode(codeToLookup);
+    setIsLoadingApi(false);
+
+    if (response.success && response.product) {
+      const p = response.product;
+      if (p.product_name) setName(p.product_name);
+      if (p.brands) setBrand(p.brands);
+      if (p.image_front_url || p.image_front_small_url) {
+        setImageUrl(p.image_front_url || p.image_front_small_url || '');
+      }
+      setApiMessage({ text: response.message, type: 'success' });
+    } else {
+      setApiMessage({ text: response.message, type: 'error' });
+    }
+  };
 
   const handleScanBarcode = async (scannedCode: string) => {
     setShowScanner(false);
     setBarcode(scannedCode);
     setShowProductModal(true);
 
-    // Try auto-lookup on Open Food Facts API
-    setIsLoadingApi(true);
-    setApiMessage('Buscando dados do produto na base pública Open Food Facts...');
-    try {
-      const res = await fetch(`https://br.openfoodfacts.org/api/v2/product/${scannedCode}.json`);
-      if (res.ok) {
-        const data = await res.json();
-        if (data.status === 1 && data.product) {
-          const p = data.product;
-          if (p.product_name) setName(p.product_name);
-          if (p.brands) setBrand(p.brands);
-          if (p.image_front_url) setImageUrl(p.image_front_url);
-          setApiMessage('Dados do produto preenchidos automaticamente com sucesso!');
-        } else {
-          setApiMessage('Código de barras lido. Preencha os detalhes do produto.');
-        }
-      }
-    } catch (e) {
-      setApiMessage('Não foi possível conectar à base pública. Preencha manualmente.');
-    } finally {
-      setIsLoadingApi(false);
-    }
+    await lookupBarcode(scannedCode);
   };
 
   const handleSaveProduct = (e: React.FormEvent) => {
@@ -82,6 +90,10 @@ export const ProductsModule: React.FC = () => {
     setApiMessage(null);
   };
 
+  const handleImageError = (id: string) => {
+    setFailedImageIds((prev) => new Set(prev).add(id));
+  };
+
   const filteredProducts = products.filter((p) => {
     const matchesSearch =
       p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -98,7 +110,9 @@ export const ProductsModule: React.FC = () => {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-800">Cadastro de Produtos</h2>
-          <p className="text-sm text-slate-500">Cadastre e gerencie os produtos da sua despensa e das suas listas.</p>
+          <p className="text-sm text-slate-500">
+            Cadastre e gerencie os produtos da sua despensa com integração Open Food Facts v3.
+          </p>
         </div>
 
         <div className="flex items-center space-x-2">
@@ -154,42 +168,51 @@ export const ProductsModule: React.FC = () => {
 
       {/* Products Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-        {filteredProducts.map((p) => (
-          <div
-            key={p.id}
-            className="bg-white rounded-2xl border border-slate-200/80 shadow-sm hover:shadow-md transition overflow-hidden flex flex-col justify-between"
-          >
-            <div className="relative aspect-video bg-slate-100 flex items-center justify-center overflow-hidden border-b border-slate-100">
-              {p.image_url ? (
-                <img src={p.image_url} alt={p.name} className="w-full h-full object-cover" />
-              ) : (
-                <div className="flex flex-col items-center justify-center text-slate-400 space-y-1">
-                  <Package className="w-8 h-8 stroke-1" />
-                  <span className="text-xs">Sem foto</span>
-                </div>
-              )}
-              <span className="absolute top-2 right-2 bg-slate-900/70 backdrop-blur-md text-white text-[10px] font-semibold px-2 py-0.5 rounded-full">
-                {p.category}
-              </span>
-            </div>
+        {filteredProducts.map((p) => {
+          const hasFailedImage = failedImageIds.has(p.id);
 
-            <div className="p-4 space-y-2 flex-1 flex flex-col justify-between">
-              <div>
-                <h3 className="font-bold text-slate-800 text-sm line-clamp-1">{p.name}</h3>
-                {p.brand && <p className="text-xs text-slate-500 font-medium">{p.brand}</p>}
-              </div>
-
-              <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-                <span>Unidade: <strong className="text-slate-700">{p.unit}</strong></span>
-                {p.barcode && (
-                  <span className="font-mono text-[11px] bg-slate-100 px-2 py-0.5 rounded text-slate-600">
-                    {p.barcode}
-                  </span>
+          return (
+            <div
+              key={p.id}
+              className="bg-white rounded-2xl border border-slate-200/80 shadow-sm hover:shadow-md transition overflow-hidden flex flex-col justify-between"
+            >
+              <div className="relative aspect-video bg-slate-100 flex items-center justify-center overflow-hidden border-b border-slate-100">
+                {p.image_url && !hasFailedImage ? (
+                  <img
+                    src={p.image_url}
+                    alt={p.name}
+                    onError={() => handleImageError(p.id)}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="flex flex-col items-center justify-center text-slate-400 space-y-1">
+                    <Package className="w-8 h-8 stroke-1" />
+                    <span className="text-[11px]">Sem foto ou indisponível</span>
+                  </div>
                 )}
+                <span className="absolute top-2 right-2 bg-slate-900/70 backdrop-blur-md text-white text-[10px] font-semibold px-2 py-0.5 rounded-full">
+                  {p.category}
+                </span>
+              </div>
+
+              <div className="p-4 space-y-2 flex-1 flex flex-col justify-between">
+                <div>
+                  <h3 className="font-bold text-slate-800 text-sm line-clamp-1">{p.name}</h3>
+                  {p.brand && <p className="text-xs text-slate-500 font-medium">{p.brand}</p>}
+                </div>
+
+                <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+                  <span>Unidade: <strong className="text-slate-700">{p.unit}</strong></span>
+                  {p.barcode && (
+                    <span className="font-mono text-[11px] bg-slate-100 px-2 py-0.5 rounded text-slate-600">
+                      {p.barcode}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Product Scanner Modal */}
@@ -207,13 +230,59 @@ export const ProductsModule: React.FC = () => {
             <h3 className="text-xl font-bold text-slate-800">Cadastrar Produto</h3>
 
             {apiMessage && (
-              <div className="p-3 bg-green-50 border border-green-200 rounded-xl text-xs text-green-800 flex items-center space-x-2">
-                <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-green-600" />
-                <span>{apiMessage}</span>
+              <div
+                className={`p-3 rounded-xl text-xs flex items-center space-x-2 border ${
+                  apiMessage.type === 'success'
+                    ? 'bg-green-50 border-green-200 text-green-800'
+                    : apiMessage.type === 'error'
+                    ? 'bg-amber-50 border-amber-200 text-amber-800'
+                    : 'bg-blue-50 border-blue-200 text-blue-800'
+                }`}
+              >
+                {apiMessage.type === 'success' ? (
+                  <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-green-600" />
+                ) : (
+                  <AlertCircle className="w-4 h-4 flex-shrink-0 text-amber-600" />
+                )}
+                <span>{apiMessage.text}</span>
               </div>
             )}
 
             <form onSubmit={handleSaveProduct} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">Código de Barras (EAN)</label>
+                <div className="flex items-center space-x-2">
+                  <div className="relative flex-1">
+                    <input
+                      type="text"
+                      value={barcode}
+                      onChange={(e) => setBarcode(e.target.value)}
+                      placeholder="Ex: 7891000100103"
+                      className="w-full pl-3.5 pr-8 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-green-500 text-sm font-mono"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowScanner(true)}
+                      className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600"
+                    >
+                      <Scan className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={isLoadingApi || !barcode.trim()}
+                    onClick={() => lookupBarcode(barcode)}
+                    className="px-3 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-semibold flex items-center space-x-1 disabled:opacity-50"
+                  >
+                    {isLoadingApi ? (
+                      <Loader2 className="w-4 h-4 animate-spin text-green-400" />
+                    ) : (
+                      <span>Consultar v3</span>
+                    )}
+                  </button>
+                </div>
+              </div>
+
               <div>
                 <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">Nome do Produto</label>
                 <input
@@ -257,65 +326,47 @@ export const ProductsModule: React.FC = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">Código de Barras</label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      value={barcode}
-                      onChange={(e) => setBarcode(e.target.value)}
-                      placeholder="789..."
-                      className="w-full pl-3.5 pr-8 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-green-500 text-sm font-mono"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowScanner(true)}
-                      className="absolute right-2 top-2 text-slate-400 hover:text-slate-600"
-                    >
-                      <Scan className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">Unidade Medida</label>
-                  <select
-                    value={unit}
-                    onChange={(e) => setUnit(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-green-500 text-sm bg-white"
-                  >
-                    <option value="un">Unidade (un)</option>
-                    <option value="kg">Quilograma (kg)</option>
-                    <option value="g">Grama (g)</option>
-                    <option value="l">Litro (l)</option>
-                    <option value="ml">Mililitro (ml)</option>
-                    <option value="cx">Caixa (cx)</option>
-                    <option value="pct">Pacote (pct)</option>
-                  </select>
-                </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">Unidade Medida</label>
+                <select
+                  value={unit}
+                  onChange={(e) => setUnit(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-green-500 text-sm bg-white"
+                >
+                  <option value="un">Unidade (un)</option>
+                  <option value="kg">Quilograma (kg)</option>
+                  <option value="g">Grama (g)</option>
+                  <option value="l">Litro (l)</option>
+                  <option value="ml">Mililitro (ml)</option>
+                  <option value="cx">Caixa (cx)</option>
+                  <option value="pct">Pacote (pct)</option>
+                </select>
               </div>
 
               <div>
                 <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">
-                  URL Direta da Foto
+                  URL Direta da Foto (image_front_url)
                 </label>
                 <div className="relative">
                   <input
                     type="url"
                     value={imageUrl}
                     onChange={(e) => setImageUrl(e.target.value)}
-                    placeholder="https://exemplo.com/foto-produto.jpg"
+                    placeholder="https://images.openfoodfacts.org/..."
                     className="w-full pl-3.5 pr-8 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-green-500 text-sm"
                   />
                   <ImageIcon className="w-4 h-4 text-slate-400 absolute right-2.5 top-2.5" />
                 </div>
-                <p className="text-[11px] text-slate-400 mt-1">Insira um link direto de imagem na web para economizar espaço no banco.</p>
               </div>
 
               {imageUrl && (
-                <div className="rounded-xl overflow-hidden border border-slate-200 h-28 bg-slate-50 flex items-center justify-center">
-                  <img src={imageUrl} alt="Pré-visualização" className="h-full object-cover" />
+                <div className="rounded-xl overflow-hidden border border-slate-200 h-32 bg-slate-50 flex items-center justify-center">
+                  <img
+                    src={imageUrl}
+                    alt="Pré-visualização"
+                    onError={() => setImageUrl('')}
+                    className="h-full object-cover"
+                  />
                 </div>
               )}
 
