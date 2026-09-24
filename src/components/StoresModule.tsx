@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Store, StoreNetwork } from '../types';
-import { LocalData } from '../lib/storage';
-import { Store as StoreIcon, Building2, Plus, MapPin, Tag } from 'lucide-react';
+import { SupabaseData } from '../lib/supabaseData';
+import { Store as StoreIcon, Building2, Plus, MapPin } from 'lucide-react';
 
 export const StoresModule: React.FC = () => {
-  const [stores, setStores] = useState<Store[]>(LocalData.getStores());
-  const [networks, setNetworks] = useState<StoreNetwork[]>(LocalData.getNetworks());
+  const [stores, setStores] = useState<Store[]>([]);
+  const [networks, setNetworks] = useState<StoreNetwork[]>([]);
   const [activeTab, setActiveTab] = useState<'stores' | 'networks'>('stores');
 
   // Store Form State
@@ -22,11 +22,22 @@ export const StoresModule: React.FC = () => {
   const [networkName, setNetworkName] = useState('');
   const [networkDesc, setNetworkDesc] = useState('');
 
-  const handleSaveStore = (e: React.FormEvent) => {
+  const loadData = async () => {
+    const fetchedStores = await SupabaseData.getStores();
+    const fetchedNetworks = await SupabaseData.getNetworks();
+    setStores(fetchedStores);
+    setNetworks(fetchedNetworks);
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const handleSaveStore = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!storeName.trim()) return;
 
-    const saved = LocalData.saveStore({
+    await SupabaseData.saveStore({
       name: storeName,
       store_type: storeType,
       network_id: networkId || undefined,
@@ -35,23 +46,23 @@ export const StoresModule: React.FC = () => {
       state,
     });
 
-    setStores(LocalData.getStores());
+    await loadData();
     setShowStoreModal(false);
     setStoreName('');
     setAddress('');
     setCity('');
   };
 
-  const handleSaveNetwork = (e: React.FormEvent) => {
+  const handleSaveNetwork = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!networkName.trim()) return;
 
-    const saved = LocalData.saveNetwork({
+    await SupabaseData.saveNetwork({
       name: networkName,
       description: networkDesc,
     });
 
-    setNetworks(LocalData.getNetworks());
+    await loadData();
     setShowNetworkModal(false);
     setNetworkName('');
     setNetworkDesc('');

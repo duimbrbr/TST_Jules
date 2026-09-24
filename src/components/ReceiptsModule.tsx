@@ -1,12 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Receipt, ReceiptItem, Store } from '../types';
-import { LocalData } from '../lib/storage';
+import { SupabaseData } from '../lib/supabaseData';
 import { BarcodeScannerModal } from './BarcodeScannerModal';
-import { FileText, QrCode, Scan, Plus, CheckCircle2, AlertCircle, ExternalLink, Calendar, Store as StoreIcon } from 'lucide-react';
+import { QrCode, Plus, Calendar } from 'lucide-react';
 
 export const ReceiptsModule: React.FC = () => {
-  const [receipts, setReceipts] = useState<Receipt[]>(LocalData.getReceipts());
-  const [stores] = useState<Store[]>(LocalData.getStores());
+  const [receipts, setReceipts] = useState<Receipt[]>([]);
+  const [stores, setStores] = useState<Store[]>([]);
 
   const [showScanner, setShowScanner] = useState(false);
   const [showManualModal, setShowManualModal] = useState(false);
@@ -19,11 +19,20 @@ export const ReceiptsModule: React.FC = () => {
   const [accessKey, setAccessKey] = useState('');
   const [itemsText, setItemsText] = useState('');
 
-  const parseSefazUrl = (url: string) => {
-    // Simulated parser for SEFAZ RS NFC-e QR Code URLs
+  const loadData = async () => {
+    const fetchedReceipts = await SupabaseData.getReceipts();
+    const fetchedStores = await SupabaseData.getStores();
+    setReceipts(fetchedReceipts);
+    setStores(fetchedStores);
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const parseSefazUrl = async (url: string) => {
     setScannedUrl(url);
 
-    // Extract access key from standard NFC-e URL parameter p=
     let extractedKey = '';
     const match = url.match(/p=([0-9]{44})/);
     if (match) {
@@ -34,10 +43,8 @@ export const ReceiptsModule: React.FC = () => {
       extractedKey = `43240${Math.floor(100000000000000 + Math.random() * 900000000000000)}`;
     }
 
-    // Pick store from list or create RS store
-    const store = stores[0] || { id: 'store-1', name: 'Zaffari Ipiranga', network_id: 'net-1', network_name: 'Rede Zaffari' };
+    const store = stores[0] || { id: '', name: 'Zaffari Ipiranga', network_id: '', network_name: 'Rede Zaffari' };
 
-    // Auto-extracted items simulation for SEFAZ RS
     const extractedItems: ReceiptItem[] = [
       { id: `ri-${Date.now()}-1`, product_name: 'Leite Integral 1L', barcode: '7891000100103', quantity: 3, unit_price: 4.89, total_price: 14.67 },
       { id: `ri-${Date.now()}-2`, product_name: 'Café Torrado e Moído 500g', barcode: '7891000241011', quantity: 1, unit_price: 19.90, total_price: 19.90 },
@@ -46,9 +53,8 @@ export const ReceiptsModule: React.FC = () => {
 
     const total = extractedItems.reduce((acc, i) => acc + i.total_price, 0);
 
-    const user = LocalData.getUser();
-    const newReceipt = LocalData.saveReceipt({
-      user_id: user?.id || 'usr-demo',
+    const newReceipt = await SupabaseData.saveReceipt({
+      user_id: '',
       store_id: store.id,
       store_name: store.name,
       network_id: store.network_id,
@@ -61,22 +67,21 @@ export const ReceiptsModule: React.FC = () => {
       items: extractedItems,
     });
 
-    setReceipts(LocalData.getReceipts());
+    await loadData();
     setSelectedReceipt(newReceipt);
   };
 
-  const handleScanNFCe = (scannedCode: string) => {
+  const handleScanNFCe = async (scannedCode: string) => {
     setShowScanner(false);
-    parseSefazUrl(scannedCode);
+    await parseSefazUrl(scannedCode);
   };
 
-  const handleManualReceipt = (e: React.FormEvent) => {
+  const handleManualReceipt = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!totalAmount) return;
 
     const store = stores.find((s) => s.id === storeId) || stores[0];
 
-    // Parse items line by line (Ex: "Leite Integral | 2 | 4.89")
     const lines = itemsText.split('\n').filter((l) => l.trim());
     const parsedItems: ReceiptItem[] = lines.map((line, idx) => {
       const parts = line.split('|').map((p) => p.trim());
@@ -93,9 +98,8 @@ export const ReceiptsModule: React.FC = () => {
       };
     });
 
-    const user = LocalData.getUser();
-    const newReceipt = LocalData.saveReceipt({
-      user_id: user?.id || 'usr-demo',
+    await SupabaseData.saveReceipt({
+      user_id: '',
       store_id: store?.id,
       store_name: store?.name || 'Mercado Local',
       network_id: store?.network_id,
@@ -109,7 +113,7 @@ export const ReceiptsModule: React.FC = () => {
       ],
     });
 
-    setReceipts(LocalData.getReceipts());
+    await loadData();
     setShowManualModal(false);
     setTotalAmount('');
     setItemsText('');
@@ -155,7 +159,7 @@ export const ReceiptsModule: React.FC = () => {
               <div className="flex items-start justify-between">
                 <h3 className="font-bold text-slate-800 text-base">{rcpt.store_name || 'Mercado'}</h3>
                 <span className="bg-green-50 text-green-700 text-xs px-2.5 py-1 rounded-full font-bold">
-                  R$ {rcpt.total_amount.toFixed(2)}
+                  R$ {Number(rcpt.total_amount || 0).toFixed(2)}
                 </span>
               </div>
               {rcpt.network_name && (
@@ -194,7 +198,7 @@ export const ReceiptsModule: React.FC = () => {
                 </p>
               </div>
               <span className="text-lg font-bold text-green-700 bg-green-50 px-3 py-1 rounded-xl">
-                R$ {selectedReceipt.total_amount.toFixed(2)}
+                R$ {Number(selectedReceipt.total_amount || 0).toFixed(2)}
               </span>
             </div>
 
@@ -206,10 +210,10 @@ export const ReceiptsModule: React.FC = () => {
                     <div>
                       <p className="font-medium text-slate-800">{item.product_name}</p>
                       <p className="text-slate-400 text-[11px]">
-                        {item.quantity}x R$ {item.unit_price.toFixed(2)}
+                        {item.quantity}x R$ {Number(item.unit_price || 0).toFixed(2)}
                       </p>
                     </div>
-                    <span className="font-bold text-slate-700">R$ {item.total_price.toFixed(2)}</span>
+                    <span className="font-bold text-slate-700">R$ {Number(item.total_price || 0).toFixed(2)}</span>
                   </div>
                 ))}
               </div>

@@ -1,17 +1,34 @@
-import React, { useState } from 'react';
-import { LocalData } from '../lib/storage';
+import React, { useState, useEffect } from 'react';
+import { SupabaseData } from '../lib/supabaseData';
+import { Receipt, ShoppingList, Store, Product } from '../types';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Legend
 } from 'recharts';
-import { TrendingUp, ShoppingBag, Store as StoreIcon, Building2, Tag, ArrowUpDown, Award } from 'lucide-react';
+import { TrendingUp, Store as StoreIcon, Building2, Tag, ArrowUpDown, Award } from 'lucide-react';
 
 const COLORS = ['#16a34a', '#2563eb', '#d97706', '#9333ea', '#dc2626', '#0891b2', '#4f46e5'];
 
 export const ReportsModule: React.FC = () => {
-  const [receipts] = useState(LocalData.getReceipts());
-  const [lists] = useState(LocalData.getLists());
-  const [stores] = useState(LocalData.getStores());
-  const [products] = useState(LocalData.getProducts());
+  const [receipts, setReceipts] = useState<Receipt[]>([]);
+  const [lists, setLists] = useState<ShoppingList[]>([]);
+  const [stores, setStores] = useState<Store[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+
+  const loadData = async () => {
+    const fetchedReceipts = await SupabaseData.getReceipts();
+    const fetchedLists = await SupabaseData.getLists();
+    const fetchedStores = await SupabaseData.getStores();
+    const fetchedProducts = await SupabaseData.getProducts();
+
+    setReceipts(fetchedReceipts);
+    setLists(fetchedLists);
+    setStores(fetchedStores);
+    setProducts(fetchedProducts);
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
 
   // 1. Comparison of Product Prices across Stores
   const getProductPriceComparison = () => {
@@ -112,7 +129,7 @@ export const ReportsModule: React.FC = () => {
           <div>
             <p className="text-xs font-semibold text-slate-500 uppercase">Total Geral de Notas</p>
             <p className="text-2xl font-bold text-green-700 mt-1">
-              R$ {receipts.reduce((acc, r) => acc + r.total_amount, 0).toFixed(2)}
+              R$ {receipts.reduce((acc, r) => acc + Number(r.total_amount || 0), 0).toFixed(2)}
             </p>
           </div>
           <div className="p-3 bg-green-50 text-green-600 rounded-xl">
