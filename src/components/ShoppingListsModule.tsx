@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { ShoppingList, ShoppingListItem, Product, Store } from '../types';
 import { LocalData } from '../lib/storage';
 import { BarcodeScannerModal } from './BarcodeScannerModal';
+import { fetchProductByBarcode } from '../services/openFoodFactsService';
 import {
   List, Plus, Share2, Trash2, CheckSquare, Square, Scan,
-  DollarSign, ShoppingCart, ArrowLeft, Copy, Check, MessageSquare
+  DollarSign, ShoppingCart, ArrowLeft, Copy, Check, MessageSquare, Loader2, AlertCircle
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -12,7 +13,7 @@ export const ShoppingListsModule: React.FC = () => {
   const [lists, setLists] = useState<ShoppingList[]>(LocalData.getLists());
   const [selectedList, setSelectedList] = useState<ShoppingList | null>(null);
   const [items, setItems] = useState<ShoppingListItem[]>([]);
-  const [products] = useState<Product[]>(LocalData.getProducts());
+  const [products, setProducts] = useState<Product[]>(LocalData.getProducts());
   const [stores] = useState<Store[]>(LocalData.getStores());
 
   // Modal States
@@ -22,6 +23,10 @@ export const ShoppingListsModule: React.FC = () => {
   const [showScanner, setShowScanner] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
 
+  // Open Food Facts API State inside Shopping List Item Modal
+  const [isLoadingApi, setIsLoadingApi] = useState(false);
+  const [apiMessage, setApiMessage] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
+
   // New List Form
   const [listTitle, setListTitle] = useState('');
   const [listDesc, setListDesc] = useState('');
@@ -30,6 +35,7 @@ export const ShoppingListsModule: React.FC = () => {
   // Item Form
   const [selectedProductId, setSelectedProductId] = useState('');
   const [itemName, setItemName] = useState('');
+  const [itemBarcode, setItemBarcode] = useState('');
   const [itemQty, setItemQty] = useState('1');
   const [itemPrice, setItemPrice] = useState('0.00');
   const [itemCategory, setItemCategory] = useState('Mercearia');
@@ -84,10 +90,12 @@ export const ShoppingListsModule: React.FC = () => {
   const resetItemForm = () => {
     setSelectedProductId('');
     setItemName('');
+    setItemBarcode('');
     setItemQty('1');
     setItemPrice('0.00');
     setItemCategory('Mercearia');
     setItemStoreId('');
+    setApiMessage(null);
   };
 
   const handleProductSelect = (prodId: string) => {
@@ -96,24 +104,66 @@ export const ShoppingListsModule: React.FC = () => {
     if (prod) {
       setItemName(prod.name);
       setItemCategory(prod.category);
+      if (prod.barcode) setItemBarcode(prod.barcode);
     }
   };
 
-  const handleScanBarcode = (scannedCode: string) => {
-    setShowScanner(false);
-    const prod = products.find((p) => p.barcode === scannedCode);
-    if (prod) {
-      setSelectedProductId(prod.id);
-      setItemName(prod.name);
-      setItemCategory(prod.category);
-    } else {
-      setItemName(`Produto (${scannedCode})`);
+  const lookupBarcodeInOpenFoodFacts = async (codeToLookup: string) => {
+    if (!codeToLookup.trim()) return;
+
+    setIsLoadingApi(true);
+    setApiMessage({ text: 'Buscando dados na base Open Food Facts v3...', type: 'info' });
+
+    // Check if product already exists locally first
+    const existingProd = products.find((p) => p.barcode === codeToLookup.trim());
+    if (existingProd) {
+      setSelectedProductId(existingProd.id);
+      setItemName(existingProd.name);
+      setItemCategory(existingProd.category);
+      setItemBarcode(existingProd.barcode || codeToLookup);
+      setIsLoadingApi(false);
+      setApiMessage({ text: 'Produto encontrado na sua base cadastrada!', type: 'success' });
+      return;
     }
+
+    // Otherwise, call Open Food Facts API v3
+    const response = await fetchProductByBarcode(codeToLookup);
+    setIsLoadingApi(false);
+
+    if (response.success && response.product) {
+      const p = response.product;
+      const fullName = p.brands ? `${p.product_name} (${p.brands})` : (p.product_name || `Produto (${codeToLookup})`);
+      setItemName(fullName);
+      setItemBarcode(codeToLookup);
+
+      // Auto-save new product to local registry
+      const newProd = LocalData.saveProduct({
+        barcode: codeToLookup,
+        name: fullName,
+        brand: p.brands || undefined,
+        category: 'Mercearia',
+        unit: 'un',
+        image_url: p.image_front_url || p.image_front_small_url || undefined,
+      });
+
+      setProducts(LocalData.getProducts());
+      setSelectedProductId(newProd.id);
+      setApiMessage({ text: response.message, type: 'success' });
+    } else {
+      setItemBarcode(codeToLookup);
+      setItemName(`Produto ${codeToLookup}`);
+      setApiMessage({ text: response.message, type: 'error' });
+    }
+  };
+
+  const handleScanBarcode = async (scannedCode: string) => {
+    setShowScanner(false);
     setShowItemModal(true);
+    await lookupBarcodeInOpenFoodFacts(scannedCode);
   };
 
   const toggleItemCheck = (item: ShoppingListItem) => {
-    const updated = LocalData.saveListItem({
+    LocalData.saveListItem({
       ...item,
       is_checked: !item.is_checked,
     });
@@ -278,7 +328,10 @@ export const ShoppingListsModule: React.FC = () => {
                 <span>Compartilhar</span>
               </button>
               <button
-                onClick={() => setShowItemModal(true)}
+                onClick={() => {
+                  resetItemForm();
+                  setShowItemModal(true);
+                }}
                 className="flex items-center space-x-2 bg-green-600 hover:bg-green-700 text-white font-medium px-4 py-2 rounded-xl text-xs transition shadow-sm"
               >
                 <Plus className="w-4 h-4" />
@@ -510,10 +563,62 @@ export const ShoppingListsModule: React.FC = () => {
         <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
             <h3 className="text-xl font-bold text-slate-800">Adicionar Item à Lista</h3>
+
+            {apiMessage && (
+              <div
+                className={`p-3 rounded-xl text-xs flex items-center space-x-2 border ${
+                  apiMessage.type === 'success'
+                    ? 'bg-green-50 border-green-200 text-green-800'
+                    : apiMessage.type === 'error'
+                    ? 'bg-amber-50 border-amber-200 text-amber-800'
+                    : 'bg-blue-50 border-blue-200 text-blue-800'
+                }`}
+              >
+                <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                <span>{apiMessage.text}</span>
+              </div>
+            )}
+
             <form onSubmit={handleAddItem} className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">
-                  Selecionar do Cadastro (Opcional)
+                  Buscar por Código de Barras / Open Food Facts
+                </label>
+                <div className="flex items-center space-x-2">
+                  <div className="relative flex-1">
+                    <input
+                      type="text"
+                      value={itemBarcode}
+                      onChange={(e) => setItemBarcode(e.target.value)}
+                      placeholder="Ex: 7891000100103"
+                      className="w-full pl-3.5 pr-8 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-green-500 text-sm font-mono"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowScanner(true)}
+                      className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600"
+                    >
+                      <Scan className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={isLoadingApi || !itemBarcode.trim()}
+                    onClick={() => lookupBarcodeInOpenFoodFacts(itemBarcode)}
+                    className="px-3 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-semibold flex items-center space-x-1 disabled:opacity-50"
+                  >
+                    {isLoadingApi ? (
+                      <Loader2 className="w-4 h-4 animate-spin text-green-400" />
+                    ) : (
+                      <span>Consultar v3</span>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">
+                  Selecionar do Cadastro Existente
                 </label>
                 <select
                   value={selectedProductId}
@@ -581,7 +686,7 @@ export const ShoppingListsModule: React.FC = () => {
                   type="submit"
                   className="px-5 py-2 rounded-xl bg-green-600 text-white text-sm font-medium hover:bg-green-700 shadow-sm"
                 >
-                  Adicionar
+                  Adicionar Item
                 </button>
               </div>
             </form>
