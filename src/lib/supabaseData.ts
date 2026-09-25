@@ -27,6 +27,11 @@ export const SupabaseData = {
     if (result.error || !result.data) return databaseError('saving product', result.error);
     return result.data as Product;
   },
+  async deleteProduct(id: string): Promise<void> {
+    if (!isSupabaseConfigured) return LocalData.deleteProduct(id);
+    const { error } = await requireClient().from('products').delete().eq('id', id);
+    if (error) databaseError('deleting product', error);
+  },
   async getStores(): Promise<Store[]> {
     if (!isSupabaseConfigured) return LocalData.getStores();
     const { data, error } = await requireClient().from('stores').select('*, store_networks(name)').order('created_at', { ascending: false });
@@ -41,6 +46,11 @@ export const SupabaseData = {
     if (result.error || !result.data) return databaseError('saving store', result.error);
     return result.data as Store;
   },
+  async deleteStore(id: string): Promise<void> {
+    if (!isSupabaseConfigured) return LocalData.deleteStore(id);
+    const { error } = await requireClient().from('stores').delete().eq('id', id);
+    if (error) databaseError('deleting store', error);
+  },
   async getNetworks(): Promise<StoreNetwork[]> {
     if (!isSupabaseConfigured) return LocalData.getNetworks();
     const { data, error } = await requireClient().from('store_networks').select('*').order('created_at', { ascending: false });
@@ -53,6 +63,11 @@ export const SupabaseData = {
     const result = network.id ? await client.from('store_networks').update(payload).eq('id', network.id).select().single() : await client.from('store_networks').insert(payload).select().single();
     if (result.error || !result.data) return databaseError('saving network', result.error);
     return result.data as StoreNetwork;
+  },
+  async deleteNetwork(id: string): Promise<void> {
+    if (!isSupabaseConfigured) return LocalData.deleteNetwork(id);
+    const { error } = await requireClient().from('store_networks').delete().eq('id', id);
+    if (error) databaseError('deleting network', error);
   },
   async getLists(): Promise<ShoppingList[]> {
     if (!isSupabaseConfigured) return LocalData.getLists();
