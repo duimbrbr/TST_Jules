@@ -114,9 +114,60 @@ ALTER TABLE shopping_list_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE receipts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE receipt_items ENABLE ROW LEVEL SECURITY;
 
--- POLÍTICAS DE ACESSO
-CREATE POLICY "Public Read Networks" ON store_networks FOR SELECT USING (true);
-CREATE POLICY "Public Read Stores" ON stores FOR SELECT USING (true);
-CREATE POLICY "Public Read Products" ON products FOR SELECT USING (true);
+-- POLÍTICAS DE ACESSO (idempotentes para reaplicação deste script)
+DROP POLICY IF EXISTS "Public Read Networks" ON store_networks;
+DROP POLICY IF EXISTS "Public Read Stores" ON stores;
+DROP POLICY IF EXISTS "Public Read Products" ON products;
+DROP POLICY IF EXISTS "Manage Own Lists" ON shopping_lists;
+DROP POLICY IF EXISTS "Read own profile" ON profiles;
+DROP POLICY IF EXISTS "Insert own profile" ON profiles;
+DROP POLICY IF EXISTS "Update own profile" ON profiles;
+DROP POLICY IF EXISTS "Read catalog networks" ON store_networks;
+DROP POLICY IF EXISTS "Authenticated manage networks" ON store_networks;
+DROP POLICY IF EXISTS "Read catalog stores" ON stores;
+DROP POLICY IF EXISTS "Authenticated manage stores" ON stores;
+DROP POLICY IF EXISTS "Read catalog products" ON products;
+DROP POLICY IF EXISTS "Authenticated manage products" ON products;
+DROP POLICY IF EXISTS "Read owned or shared lists" ON shopping_lists;
+DROP POLICY IF EXISTS "Create own lists" ON shopping_lists;
+DROP POLICY IF EXISTS "Update owned or shared lists" ON shopping_lists;
+DROP POLICY IF EXISTS "Delete own lists" ON shopping_lists;
+DROP POLICY IF EXISTS "Read shares for accessible lists" ON shopping_list_shares;
+DROP POLICY IF EXISTS "Owner manages shares" ON shopping_list_shares;
+DROP POLICY IF EXISTS "Read items in accessible lists" ON shopping_list_items;
+DROP POLICY IF EXISTS "Edit items in accessible lists" ON shopping_list_items;
+DROP POLICY IF EXISTS "Manage own receipts" ON receipts;
+DROP POLICY IF EXISTS "Manage items in own receipts" ON receipt_items;
 
-CREATE POLICY "Manage Own Lists" ON shopping_lists FOR ALL USING (auth.uid() = owner_id);
+CREATE POLICY "Read own profile" ON profiles FOR SELECT USING (auth.uid() = id);
+CREATE POLICY "Insert own profile" ON profiles FOR INSERT WITH CHECK (auth.uid() = id);
+CREATE POLICY "Update own profile" ON profiles FOR UPDATE USING (auth.uid() = id) WITH CHECK (auth.uid() = id);
+
+CREATE POLICY "Read catalog networks" ON store_networks FOR SELECT USING (true);
+CREATE POLICY "Authenticated manage networks" ON store_networks FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Read catalog stores" ON stores FOR SELECT USING (true);
+CREATE POLICY "Authenticated manage stores" ON stores FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Read catalog products" ON products FOR SELECT USING (true);
+CREATE POLICY "Authenticated manage products" ON products FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+CREATE POLICY "Read owned or shared lists" ON shopping_lists FOR SELECT USING (auth.uid() = owner_id OR EXISTS (SELECT 1 FROM shopping_list_shares s WHERE s.list_id = id AND s.user_id = auth.uid()));
+CREATE POLICY "Create own lists" ON shopping_lists FOR INSERT TO authenticated WITH CHECK (auth.uid() = owner_id);
+CREATE POLICY "Update owned or shared lists" ON shopping_lists FOR UPDATE USING (auth.uid() = owner_id OR EXISTS (SELECT 1 FROM shopping_list_shares s WHERE s.list_id = id AND s.user_id = auth.uid() AND s.role = 'editor')) WITH CHECK (auth.uid() = owner_id);
+CREATE POLICY "Delete own lists" ON shopping_lists FOR DELETE USING (auth.uid() = owner_id);
+
+CREATE POLICY "Read shares for accessible lists" ON shopping_list_shares FOR SELECT USING (auth.uid() = user_id OR EXISTS (SELECT 1 FROM shopping_lists l WHERE l.id = list_id AND l.owner_id = auth.uid()));
+CREATE POLICY "Owner manages shares" ON shopping_list_shares FOR ALL TO authenticated USING (EXISTS (SELECT 1 FROM shopping_lists l WHERE l.id = list_id AND l.owner_id = auth.uid())) WITH CHECK (EXISTS (SELECT 1 FROM shopping_lists l WHERE l.id = list_id AND l.owner_id = auth.uid()));
+
+CREATE POLICY "Read items in accessible lists" ON shopping_list_items FOR SELECT USING (EXISTS (SELECT 1 FROM shopping_lists l LEFT JOIN shopping_list_shares s ON s.list_id = l.id AND s.user_id = auth.uid() WHERE l.id = list_id AND (l.owner_id = auth.uid() OR s.user_id IS NOT NULL)));
+CREATE POLICY "Edit items in accessible lists" ON shopping_list_items FOR ALL TO authenticated USING (EXISTS (SELECT 1 FROM shopping_lists l LEFT JOIN shopping_list_shares s ON s.list_id = l.id AND s.user_id = auth.uid() WHERE l.id = list_id AND (l.owner_id = auth.uid() OR (s.user_id IS NOT NULL AND s.role = 'editor')))) WITH CHECK (EXISTS (SELECT 1 FROM shopping_lists l LEFT JOIN shopping_list_shares s ON s.list_id = l.id AND s.user_id = auth.uid() WHERE l.id = list_id AND (l.owner_id = auth.uid() OR (s.user_id IS NOT NULL AND s.role = 'editor'))));
+
+CREATE POLICY "Manage own receipts" ON receipts FOR ALL TO authenticated USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Manage items in own receipts" ON receipt_items FOR ALL TO authenticated USING (EXISTS (SELECT 1 FROM receipts r WHERE r.id = receipt_id AND r.user_id = auth.uid())) WITH CHECK (EXISTS (SELECT 1 FROM receipts r WHERE r.id = receipt_id AND r.user_id = auth.uid()));
+
+-- Acesso de leitura via token sem expor a enumeração de listas compartilhadas.
+CREATE OR REPLACE FUNCTION get_shared_list(token TEXT) RETURNS SETOF shopping_lists LANGUAGE sql SECURITY DEFINER SET search_path = public AS $$ SELECT * FROM shopping_lists WHERE share_token = token LIMIT 1; $$;
+REVOKE ALL ON FUNCTION get_shared_list(TEXT) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION get_shared_list(TEXT) TO anon, authenticated;
+CREATE OR REPLACE FUNCTION get_shared_list_items(token TEXT) RETURNS SETOF shopping_list_items LANGUAGE sql SECURITY DEFINER SET search_path = public AS $$ SELECT i.* FROM shopping_list_items i JOIN shopping_lists l ON l.id = i.list_id WHERE l.share_token = token ORDER BY i.created_at; $$;
+REVOKE ALL ON FUNCTION get_shared_list_items(TEXT) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION get_shared_list_items(TEXT) TO anon, authenticated;

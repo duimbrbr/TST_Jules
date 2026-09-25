@@ -31,7 +31,7 @@ export const ReportsModule: React.FC = () => {
   }, []);
 
   // 1. Comparison of Product Prices across Stores
-  const getProductPriceComparison = () => {
+  const getProductPriceComparison = (): Array<{ product_name: string } & Record<string, string | number>> => {
     const productMap: { [productName: string]: { [storeName: string]: number } } = {};
 
     receipts.forEach((rcpt) => {
@@ -113,6 +113,8 @@ export const ReportsModule: React.FC = () => {
   const storeData = getStoreExpenses();
   const networkData = getNetworkExpenses();
   const priceHistoryData = getPriceHistory();
+  const storeNames = Array.from(new Set(receipts.map((receipt) => receipt.store_name || 'Mercado')));
+  const historyProductNames = Array.from(new Set(receipts.flatMap((receipt) => receipt.items.map((item) => item.product_name))));
 
   return (
     <div className="space-y-8">
@@ -238,8 +240,9 @@ export const ReportsModule: React.FC = () => {
                 <YAxis stroke="#64748b" fontSize={12} />
                 <Tooltip formatter={(val: number) => `R$ ${val.toFixed(2)}`} />
                 <Legend />
-                <Line type="monotone" dataKey="Leite Integral 1L" stroke="#16a34a" strokeWidth={2} />
-                <Line type="monotone" dataKey="Café Torrado e Moído 500g" stroke="#2563eb" strokeWidth={2} />
+                {historyProductNames.map((productName, index) => (
+                  <Line key={productName} type="monotone" dataKey={productName} stroke={COLORS[index % COLORS.length]} strokeWidth={2} connectNulls />
+                ))}
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -258,34 +261,19 @@ export const ReportsModule: React.FC = () => {
             <thead className="bg-slate-50 text-slate-600 uppercase text-[11px] font-bold border-b border-slate-200">
               <tr>
                 <th className="p-3">Produto</th>
-                <th className="p-3">Zaffari Ipiranga</th>
-                <th className="p-3">Carrefour Passo d'Areia</th>
+                {storeNames.map((storeName) => <th key={storeName} className="p-3">{storeName}</th>)}
                 <th className="p-3">Melhor Opção</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-700">
-              {productComparisonData.map((row: any, idx: number) => {
-                const zaffariPrice = row['Zaffari Ipiranga'] || 0;
-                const carrefourPrice = row['Carrefour Passo d\'Areia'] || 0;
-                let bestStore = 'Preço similar';
-
-                if (zaffariPrice && carrefourPrice) {
-                  if (zaffariPrice < carrefourPrice) bestStore = 'Zaffari Ipiranga (Mais Barato)';
-                  else if (carrefourPrice < zaffariPrice) bestStore = 'Carrefour (Mais Barato)';
-                } else if (zaffariPrice) {
-                  bestStore = 'Apenas no Zaffari';
-                } else if (carrefourPrice) {
-                  bestStore = 'Apenas no Carrefour';
-                }
-
-                return (
-                  <tr key={idx} className="hover:bg-slate-50/50">
-                    <td className="p-3 font-semibold text-slate-800">{row.product_name}</td>
-                    <td className="p-3">{zaffariPrice ? `R$ ${zaffariPrice.toFixed(2)}` : '-'}</td>
-                    <td className="p-3">{carrefourPrice ? `R$ ${carrefourPrice.toFixed(2)}` : '-'}</td>
-                    <td className="p-3 font-bold text-green-700">{bestStore}</td>
-                  </tr>
-                );
+              {productComparisonData.map((row) => {
+                const prices = storeNames.map((storeName) => ({ storeName, price: Number(row[storeName] || 0) })).filter((entry) => entry.price > 0);
+                const best = prices.reduce<{ storeName: string; price: number } | null>((current, entry) => !current || entry.price < current.price ? entry : current, null);
+                return <tr key={String(row.product_name)} className="hover:bg-slate-50/50">
+                  <td className="p-3 font-semibold text-slate-800">{String(row.product_name)}</td>
+                  {storeNames.map((storeName) => <td key={storeName} className="p-3">{row[storeName] ? `R$ ${Number(row[storeName]).toFixed(2)}` : '-'}</td>)}
+                  <td className="p-3 font-bold text-green-700">{best ? `${best.storeName} (R$ ${best.price.toFixed(2)})` : '-'}</td>
+                </tr>;
               })}
             </tbody>
           </table>
