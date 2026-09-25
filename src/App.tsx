@@ -164,7 +164,7 @@ export default function App() {
       {/* Main Content Area */}
       <main className="max-w-6xl mx-auto px-4 py-6 flex-1 w-full">
         <Suspense fallback={<p className="text-sm text-slate-500">Carregando módulo…</p>}>
-          {activeTab === 'lists' && <ShoppingListsModule sharedToken={sharedToken} />}
+          {activeTab === 'lists' && <ShoppingListsModule sharedToken={sharedToken} user={user} />}
           {activeTab === 'products' && <ProductsModule />}
           {activeTab === 'stores' && <StoresModule />}
           {activeTab === 'receipts' && <ReceiptsModule />}

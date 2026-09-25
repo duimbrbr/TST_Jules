@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ShoppingList, ShoppingListItem, Product, Store } from '../types';
+import { ShoppingList, ShoppingListItem, Product, Store, UserProfile } from '../types';
 import { SupabaseData } from '../lib/supabaseData';
 import { BarcodeScannerModal } from './BarcodeScannerModal';
 import { fetchProductByBarcode } from '../services/openFoodFactsService';
@@ -9,14 +9,18 @@ import {
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
-interface ShoppingListsModuleProps { sharedToken?: string; }
+interface ShoppingListsModuleProps {
+  sharedToken?: string;
+  user: UserProfile | null;
+}
 
-export const ShoppingListsModule: React.FC<ShoppingListsModuleProps> = ({ sharedToken }) => {
+export const ShoppingListsModule: React.FC<ShoppingListsModuleProps> = ({ sharedToken, user }) => {
   const [lists, setLists] = useState<ShoppingList[]>([]);
   const [selectedList, setSelectedList] = useState<ShoppingList | null>(null);
   const [items, setItems] = useState<ShoppingListItem[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [stores, setStores] = useState<Store[]>([]);
+  const [sharedListError, setSharedListError] = useState<string | null>(null);
 
   // Modal States
   const [showNewListModal, setShowNewListModal] = useState(false);
@@ -44,23 +48,37 @@ export const ShoppingListsModule: React.FC<ShoppingListsModuleProps> = ({ shared
   const [itemStoreId, setItemStoreId] = useState('');
 
   const loadInitialData = async () => {
-    const fetchedLists = await SupabaseData.getLists();
-    const fetchedProducts = await SupabaseData.getProducts();
-    const fetchedStores = await SupabaseData.getStores();
+    const [fetchedProducts, fetchedStores] = await Promise.all([
+      SupabaseData.getProducts(),
+      SupabaseData.getStores(),
+    ]);
 
-    setLists(fetchedLists);
     setProducts(fetchedProducts);
     setStores(fetchedStores);
+  };
+
+  const loadLists = async () => {
+    const fetchedLists = await SupabaseData.getLists();
+    setLists(fetchedLists);
   };
 
   useEffect(() => {
     loadInitialData();
     if (sharedToken) {
       SupabaseData.getListByShareToken(sharedToken).then((list) => {
-        if (list) setSelectedList(list);
-      }).catch((error: unknown) => console.error('Error opening shared list:', error));
+        if (list) {
+          setSelectedList(list);
+        } else {
+          setSharedListError('Este link de lista não é válido ou não está mais disponível.');
+        }
+      }).catch((error: unknown) => {
+        console.error('Error opening shared list:', error);
+        setSharedListError('Não foi possível abrir esta lista compartilhada. Tente novamente.');
+      });
+    } else if (user) {
+      loadLists().catch((error: unknown) => console.error('Error loading lists:', error));
     }
-  }, [sharedToken]);
+  }, [sharedToken, user]);
 
   useEffect(() => {
     if (selectedList) {
@@ -243,6 +261,26 @@ export const ShoppingListsModule: React.FC<ShoppingListsModuleProps> = ({ shared
   };
 
   const { totalEstimated, totalActual, checkedCount, totalCount } = calculateTotals();
+
+  if (!sharedToken && !user) {
+    return (
+      <div className="bg-white border border-slate-200 rounded-2xl p-8 text-center space-y-3">
+        <List className="w-10 h-10 mx-auto text-green-600" />
+        <h2 className="text-xl font-bold text-slate-800">Entre para acessar suas listas</h2>
+        <p className="text-sm text-slate-500">Faça login para criar, visualizar e gerenciar listas de compras.</p>
+      </div>
+    );
+  }
+
+  if (sharedToken && sharedListError) {
+    return (
+      <div className="bg-white border border-slate-200 rounded-2xl p-8 text-center space-y-3">
+        <AlertCircle className="w-10 h-10 mx-auto text-amber-500" />
+        <h2 className="text-xl font-bold text-slate-800">Link compartilhado indisponível</h2>
+        <p className="text-sm text-slate-500">{sharedListError}</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

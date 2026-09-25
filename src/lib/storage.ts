@@ -61,12 +61,7 @@ export const initializeLocalStorage = () => {
 
 export const LocalData = {
   getUser: (): UserProfile | null => {
-    return getStoredItem<UserProfile | null>(STORAGE_KEYS.USER, {
-      id: 'usr-demo-123',
-      email: 'usuario.demo@gmail.com',
-      full_name: 'Usuário Demo',
-      avatar_url: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80'
-    });
+    return getStoredItem<UserProfile | null>(STORAGE_KEYS.USER, null);
   },
   setUser: (user: UserProfile | null) => setStoredItem(STORAGE_KEYS.USER, user),
 
