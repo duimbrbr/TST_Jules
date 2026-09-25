@@ -27,7 +27,6 @@ export const ProductsModule: React.FC = () => {
   const [category, setCategory] = useState('Mercearia');
   const [unit, setUnit] = useState('un');
   const [imageUrl, setImageUrl] = useState('');
-  const [editingProductId, setEditingProductId] = useState<string | null>(null);
 
   // Image load error state tracker for fallback rendering
   const [failedImageIds, setFailedImageIds] = useState<Set<string>>(new Set());
@@ -73,24 +72,6 @@ export const ProductsModule: React.FC = () => {
     await lookupBarcode(scannedCode);
   };
 
-  const handleEditProduct = (prod: Product) => {
-    setEditingProductId(prod.id);
-    setName(prod.name);
-    setBrand(prod.brand || '');
-    setBarcode(prod.barcode || '');
-    setCategory(prod.category || 'Mercearia');
-    setUnit(prod.unit || 'un');
-    setImageUrl(prod.image_url || '');
-    setShowProductModal(true);
-  };
-
-  const handleDeleteProduct = async (id: string, prodName: string) => {
-    if (window.confirm(`Tem certeza que deseja excluir o produto "${prodName}"?`)) {
-      await SupabaseData.deleteProduct(id);
-      await loadProducts();
-    }
-  };
-
   const handleSaveProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
@@ -118,7 +99,6 @@ export const ProductsModule: React.FC = () => {
     setCategory('Mercearia');
     setUnit('un');
     setImageUrl('');
-    setEditingProductId(null);
     setApiMessage(null);
   };
 
@@ -249,14 +229,14 @@ export const ProductsModule: React.FC = () => {
 
                 <div className="absolute top-2 left-2 flex items-center space-x-1 opacity-90 sm:opacity-0 group-hover:opacity-100 transition">
                   <button
-                    onClick={() => handleEditProduct(p)}
+                    onClick={() => openEditProduct(p)}
                     className="p-1.5 bg-white/90 hover:bg-white text-slate-700 rounded-lg shadow-sm"
                     title="Editar Produto"
                   >
-                    <Edit2 className="w-3.5 h-3.5" />
+                    <Pencil className="w-3.5 h-3.5" />
                   </button>
                   <button
-                    onClick={() => handleDeleteProduct(p.id, p.name)}
+                    onClick={() => handleDeleteProduct(p)}
                     className="p-1.5 bg-white/90 hover:bg-white text-red-600 rounded-lg shadow-sm"
                     title="Excluir Produto"
                   >
