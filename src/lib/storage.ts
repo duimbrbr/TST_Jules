@@ -79,6 +79,15 @@ export const LocalData = {
     if (index >= 0) networks[index] = newNetwork;
     else networks.push(newNetwork);
     setStoredItem(STORAGE_KEYS.NETWORKS, networks);
+
+    // Store the denormalized name together with the store so the local fallback
+    // remains consistent with the joined value returned by Supabase.
+    if (index >= 0) {
+      setStoredItem(STORAGE_KEYS.STORES, LocalData.getStores().map((store) => (
+        store.network_id === id ? { ...store, network_name: newNetwork.name } : store
+      )));
+    }
+
     return newNetwork;
   },
   deleteNetwork: (id: string) => {
