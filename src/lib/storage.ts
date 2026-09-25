@@ -81,6 +81,10 @@ export const LocalData = {
     setStoredItem(STORAGE_KEYS.NETWORKS, networks);
     return newNetwork;
   },
+  deleteNetwork: (id: string) => {
+    const networks = LocalData.getNetworks().filter(n => n.id !== id);
+    setStoredItem(STORAGE_KEYS.NETWORKS, networks);
+  },
 
   getStores: (): Store[] => getStoredItem(STORAGE_KEYS.STORES, DEFAULT_STORES),
   saveStore: (store: Omit<Store, 'id'> & { id?: string }) => {
@@ -95,6 +99,10 @@ export const LocalData = {
     setStoredItem(STORAGE_KEYS.STORES, stores);
     return newStore;
   },
+  deleteStore: (id: string) => {
+    const stores = LocalData.getStores().filter(s => s.id !== id);
+    setStoredItem(STORAGE_KEYS.STORES, stores);
+  },
 
   getProducts: (): Product[] => getStoredItem(STORAGE_KEYS.PRODUCTS, DEFAULT_PRODUCTS),
   saveProduct: (product: Omit<Product, 'id'> & { id?: string }) => {
@@ -106,6 +114,10 @@ export const LocalData = {
     else products.push(newProduct);
     setStoredItem(STORAGE_KEYS.PRODUCTS, products);
     return newProduct;
+  },
+  deleteProduct: (id: string) => {
+    const products = LocalData.getProducts().filter(p => p.id !== id);
+    setStoredItem(STORAGE_KEYS.PRODUCTS, products);
   },
 
   getLists: (): ShoppingList[] => getStoredItem(STORAGE_KEYS.LISTS, [

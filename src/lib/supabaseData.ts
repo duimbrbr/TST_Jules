@@ -44,6 +44,17 @@ export const SupabaseData = {
     return localSaved;
   },
 
+  async deleteProduct(id: string): Promise<void> {
+    LocalData.deleteProduct(id);
+    if (!isSupabaseConfigured || !supabase) return;
+
+    try {
+      await supabase.from('products').delete().eq('id', id);
+    } catch (e) {
+      console.error('Error deleting product from Supabase:', e);
+    }
+  },
+
   // STORES
   async getStores(): Promise<Store[]> {
     if (!isSupabaseConfigured || !supabase) return LocalData.getStores();
@@ -100,6 +111,17 @@ export const SupabaseData = {
     return localSaved;
   },
 
+  async deleteStore(id: string): Promise<void> {
+    LocalData.deleteStore(id);
+    if (!isSupabaseConfigured || !supabase) return;
+
+    try {
+      await supabase.from('stores').delete().eq('id', id);
+    } catch (e) {
+      console.error('Error deleting store from Supabase:', e);
+    }
+  },
+
   // NETWORKS
   async getNetworks(): Promise<StoreNetwork[]> {
     if (!isSupabaseConfigured || !supabase) return LocalData.getNetworks();
@@ -135,6 +157,17 @@ export const SupabaseData = {
       console.error('Error saving network to Supabase:', e);
     }
     return localSaved;
+  },
+
+  async deleteNetwork(id: string): Promise<void> {
+    LocalData.deleteNetwork(id);
+    if (!isSupabaseConfigured || !supabase) return;
+
+    try {
+      await supabase.from('store_networks').delete().eq('id', id);
+    } catch (e) {
+      console.error('Error deleting network from Supabase:', e);
+    }
   },
 
   // SHOPPING LISTS
