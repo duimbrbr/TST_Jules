@@ -66,7 +66,8 @@ npm install
 Crie um arquivo `.env.local` na raiz do projeto caso queira conectar ao seu projeto Supabase:
 ```env
 VITE_SUPABASE_URL=https://seu-projeto.supabase.co
-VITE_SUPABASE_ANON_KEY=sua-chave-anonima-aqui
+VITE_SUPABASE_PUBLISHABLE_KEY=sua-chave-publica-aqui
+# Também é aceito: VITE_SUPABASE_ANON_KEY=sua-chave-anonima-aqui
 ```
 > **Nota**: Se você não criar o arquivo `.env.local`, a aplicação rodará normalmente no modo **Local Storage Fallback**, permitindo testar 100% das telas e dados localmente sem nenhuma configuração adicional!
 

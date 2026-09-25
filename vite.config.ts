@@ -7,7 +7,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
+      includeAssets: ['mercadolista-icon.svg', 'apple-touch-icon.svg', 'masked-icon.svg'],
       manifest: {
         name: 'MercadoLista - Lista de Compras Inteligente',
         short_name: 'MercadoLista',
@@ -17,14 +17,14 @@ export default defineConfig({
         display: 'standalone',
         icons: [
           {
-            src: 'pwa-192x192.png',
-            sizes: '192x192',
-            type: 'image/png'
+            src: 'mercadolista-icon.svg',
+            sizes: 'any',
+            type: 'image/svg+xml'
           },
           {
-            src: 'pwa-512x512.png',
-            sizes: '512x512',
-            type: 'image/png'
+            src: 'mercadolista-icon.svg',
+            sizes: 'any',
+            type: 'image/svg+xml'
           }
         ]
       }

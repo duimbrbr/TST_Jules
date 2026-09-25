@@ -9,7 +9,9 @@ import {
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
-export const ShoppingListsModule: React.FC = () => {
+interface ShoppingListsModuleProps { sharedToken?: string; }
+
+export const ShoppingListsModule: React.FC<ShoppingListsModuleProps> = ({ sharedToken }) => {
   const [lists, setLists] = useState<ShoppingList[]>([]);
   const [selectedList, setSelectedList] = useState<ShoppingList | null>(null);
   const [items, setItems] = useState<ShoppingListItem[]>([]);
@@ -53,13 +55,19 @@ export const ShoppingListsModule: React.FC = () => {
 
   useEffect(() => {
     loadInitialData();
-  }, []);
+    if (sharedToken) {
+      SupabaseData.getListByShareToken(sharedToken).then((list) => {
+        if (list) setSelectedList(list);
+      }).catch((error: unknown) => console.error('Error opening shared list:', error));
+    }
+  }, [sharedToken]);
 
   useEffect(() => {
     if (selectedList) {
-      SupabaseData.getListItems(selectedList.id).then(setItems);
+      const loader = sharedToken ? SupabaseData.getSharedListItems(sharedToken) : SupabaseData.getListItems(selectedList.id);
+      loader.then(setItems).catch((error: unknown) => console.error('Error loading list items:', error));
     }
-  }, [selectedList]);
+  }, [selectedList, sharedToken]);
 
   const handleCreateList = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -82,6 +90,7 @@ export const ShoppingListsModule: React.FC = () => {
 
   const handleAddItem = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (sharedToken) return;
     if (!selectedList || !itemName.trim()) return;
 
     await SupabaseData.saveListItem({
@@ -179,6 +188,7 @@ export const ShoppingListsModule: React.FC = () => {
   };
 
   const toggleItemCheck = async (item: ShoppingListItem) => {
+    if (sharedToken) return;
     await SupabaseData.saveListItem({
       ...item,
       is_checked: !item.is_checked,
@@ -194,13 +204,14 @@ export const ShoppingListsModule: React.FC = () => {
   };
 
   const handleDeleteItem = async (itemId: string) => {
-    if (!selectedList) return;
+    if (!selectedList || sharedToken) return;
     await SupabaseData.deleteListItem(itemId);
     const refreshedItems = await SupabaseData.getListItems(selectedList.id);
     setItems(refreshedItems);
   };
 
   const handleDeleteList = async (listId: string) => {
+    if (sharedToken) return;
     await SupabaseData.deleteList(listId);
     const refreshedLists = await SupabaseData.getLists();
     setLists(refreshedLists);
@@ -326,7 +337,7 @@ export const ShoppingListsModule: React.FC = () => {
               </button>
               <div>
                 <h2 className="text-xl font-bold text-slate-800">{selectedList.title}</h2>
-                <p className="text-xs text-slate-500">{selectedList.description || 'Lista compartilhada'}</p>
+                <p className="text-xs text-slate-500">{selectedList.description || 'Lista compartilhada'}{sharedToken ? ' · Visualização por link' : ''}</p>
               </div>
             </div>
 
