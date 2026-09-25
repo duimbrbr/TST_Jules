@@ -5,7 +5,7 @@ import { BarcodeScannerModal } from './BarcodeScannerModal';
 import { fetchProductByBarcode } from '../services/openFoodFactsService';
 import {
   Package, Plus, Scan, Search, Image as ImageIcon,
-  CheckCircle2, AlertCircle, Loader2, Edit2, Trash2
+  CheckCircle2, AlertCircle, Loader2, Pencil, Trash2
 } from 'lucide-react';
 
 export const ProductsModule: React.FC = () => {
@@ -27,6 +27,7 @@ export const ProductsModule: React.FC = () => {
   const [category, setCategory] = useState('Mercearia');
   const [unit, setUnit] = useState('un');
   const [imageUrl, setImageUrl] = useState('');
+  const [editingProductId, setEditingProductId] = useState<string | null>(null);
 
   // Image load error state tracker for fallback rendering
   const [failedImageIds, setFailedImageIds] = useState<Set<string>>(new Set());
@@ -117,7 +118,26 @@ export const ProductsModule: React.FC = () => {
     setCategory('Mercearia');
     setUnit('un');
     setImageUrl('');
+    setEditingProductId(null);
     setApiMessage(null);
+  };
+
+  const openEditProduct = (product: Product) => {
+    setEditingProductId(product.id);
+    setName(product.name);
+    setBrand(product.brand || '');
+    setBarcode(product.barcode || '');
+    setCategory(product.category);
+    setUnit(product.unit);
+    setImageUrl(product.image_url || '');
+    setApiMessage(null);
+    setShowProductModal(true);
+  };
+
+  const handleDeleteProduct = async (product: Product) => {
+    if (!window.confirm(`Excluir o produto \"${product.name}\"?`)) return;
+    await SupabaseData.deleteProduct(product.id);
+    await loadProducts();
   };
 
   const handleImageError = (id: string) => {
@@ -147,7 +167,10 @@ export const ProductsModule: React.FC = () => {
 
         <div className="flex items-center space-x-2">
           <button
-            onClick={() => setShowScanner(true)}
+            onClick={() => {
+              resetForm();
+              setShowScanner(true);
+            }}
             className="flex items-center space-x-2 bg-slate-800 hover:bg-slate-900 text-white font-medium px-4 py-2.5 rounded-xl shadow-sm transition"
           >
             <Scan className="w-5 h-5 text-green-400" />
@@ -256,6 +279,14 @@ export const ProductsModule: React.FC = () => {
                     </span>
                   )}
                 </div>
+                <div className="flex justify-end gap-2 pt-1">
+                  <button onClick={() => openEditProduct(p)} className="p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800 rounded-lg" title={`Editar ${p.name}`} aria-label={`Editar ${p.name}`}>
+                    <Pencil className="w-4 h-4" />
+                  </button>
+                  <button onClick={() => handleDeleteProduct(p)} className="p-2 text-red-500 hover:bg-red-50 hover:text-red-700 rounded-lg" title={`Excluir ${p.name}`} aria-label={`Excluir ${p.name}`}>
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
             </div>
           );
@@ -274,9 +305,7 @@ export const ProductsModule: React.FC = () => {
       {showProductModal && (
         <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
-            <h3 className="text-xl font-bold text-slate-800">
-              {editingProductId ? 'Editar Produto' : 'Cadastrar Produto'}
-            </h3>
+            <h3 className="text-xl font-bold text-slate-800">{editingProductId ? 'Editar Produto' : 'Cadastrar Produto'}</h3>
 
             {apiMessage && (
               <div

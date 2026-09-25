@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Store, StoreNetwork } from '../types';
 import { SupabaseData } from '../lib/supabaseData';
-import { Store as StoreIcon, Building2, Plus, MapPin, Edit2, Trash2 } from 'lucide-react';
+import { Store as StoreIcon, Building2, Plus, MapPin, Pencil, Trash2 } from 'lucide-react';
 
 export const StoresModule: React.FC = () => {
   const [stores, setStores] = useState<Store[]>([]);
@@ -17,12 +17,14 @@ export const StoresModule: React.FC = () => {
   const [address, setAddress] = useState('');
   const [city, setCity] = useState('');
   const [state, setState] = useState('RS');
+  const [editingStoreId, setEditingStoreId] = useState<string | null>(null);
 
   // Network Form State
   const [showNetworkModal, setShowNetworkModal] = useState(false);
   const [editingNetworkId, setEditingNetworkId] = useState<string | null>(null);
   const [networkName, setNetworkName] = useState('');
   const [networkDesc, setNetworkDesc] = useState('');
+  const [editingNetworkId, setEditingNetworkId] = useState<string | null>(null);
 
   const loadData = async () => {
     const fetchedStores = await SupabaseData.getStores();
@@ -79,21 +81,7 @@ export const StoresModule: React.FC = () => {
     setNetworkId('');
     setAddress('');
     setCity('');
-    setState('RS');
-  };
-
-  const handleEditNetwork = (net: StoreNetwork) => {
-    setEditingNetworkId(net.id);
-    setNetworkName(net.name);
-    setNetworkDesc(net.description || '');
-    setShowNetworkModal(true);
-  };
-
-  const handleDeleteNetwork = async (id: string, nName: string) => {
-    if (window.confirm(`Tem certeza que deseja excluir a rede "${nName}"?`)) {
-      await SupabaseData.deleteNetwork(id);
-      await loadData();
-    }
+    setEditingStoreId(null);
   };
 
   const handleSaveNetwork = async (e: React.FormEvent) => {
@@ -115,6 +103,55 @@ export const StoresModule: React.FC = () => {
     setEditingNetworkId(null);
     setNetworkName('');
     setNetworkDesc('');
+    setEditingNetworkId(null);
+  };
+
+  const openEditStore = (store: Store) => {
+    setEditingStoreId(store.id);
+    setStoreName(store.name);
+    setStoreType(store.store_type);
+    setNetworkId(store.network_id || '');
+    setAddress(store.address || '');
+    setCity(store.city || '');
+    setState(store.state);
+    setShowStoreModal(true);
+  };
+
+  const openEditNetwork = (network: StoreNetwork) => {
+    setEditingNetworkId(network.id);
+    setNetworkName(network.name);
+    setNetworkDesc(network.description || '');
+    setShowNetworkModal(true);
+  };
+
+  const handleDeleteStore = async (store: Store) => {
+    if (!window.confirm(`Excluir a loja \"${store.name}\"?`)) return;
+    await SupabaseData.deleteStore(store.id);
+    await loadData();
+  };
+
+  const handleDeleteNetwork = async (network: StoreNetwork) => {
+    if (!window.confirm(`Excluir a rede \"${network.name}\"? As lojas vinculadas ficarão sem rede.`)) return;
+    await SupabaseData.deleteNetwork(network.id);
+    await loadData();
+  };
+
+  const openNewStore = () => {
+    setEditingStoreId(null);
+    setStoreName('');
+    setStoreType('Supermercado');
+    setNetworkId('');
+    setAddress('');
+    setCity('');
+    setState('RS');
+    setShowStoreModal(true);
+  };
+
+  const openNewNetwork = () => {
+    setEditingNetworkId(null);
+    setNetworkName('');
+    setNetworkDesc('');
+    setShowNetworkModal(true);
   };
 
   return (
@@ -128,10 +165,7 @@ export const StoresModule: React.FC = () => {
         <div className="flex items-center space-x-2">
           {activeTab === 'stores' ? (
             <button
-              onClick={() => {
-                resetStoreForm();
-                setShowStoreModal(true);
-              }}
+              onClick={openNewStore}
               className="flex items-center space-x-2 bg-green-600 hover:bg-green-700 text-white font-medium px-4 py-2.5 rounded-xl shadow-sm transition"
             >
               <Plus className="w-5 h-5" />
@@ -139,10 +173,7 @@ export const StoresModule: React.FC = () => {
             </button>
           ) : (
             <button
-              onClick={() => {
-                resetNetworkForm();
-                setShowNetworkModal(true);
-              }}
+              onClick={openNewNetwork}
               className="flex items-center space-x-2 bg-green-600 hover:bg-green-700 text-white font-medium px-4 py-2.5 rounded-xl shadow-sm transition"
             >
               <Plus className="w-5 h-5" />
@@ -224,6 +255,10 @@ export const StoresModule: React.FC = () => {
                   </span>
                 </div>
               )}
+              <div className="flex justify-end gap-2 pt-1 border-t border-slate-100">
+                <button onClick={() => openEditStore(s)} className="p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800 rounded-lg" title={`Editar ${s.name}`} aria-label={`Editar ${s.name}`}><Pencil className="w-4 h-4" /></button>
+                <button onClick={() => handleDeleteStore(s)} className="p-2 text-red-500 hover:bg-red-50 hover:text-red-700 rounded-lg" title={`Excluir ${s.name}`} aria-label={`Excluir ${s.name}`}><Trash2 className="w-4 h-4" /></button>
+              </div>
             </div>
           ))}
         </div>
@@ -262,6 +297,10 @@ export const StoresModule: React.FC = () => {
                   </div>
                 </div>
                 <p className="text-xs text-slate-500">{n.description || 'Sem descrição cadastrada.'}</p>
+                <div className="flex justify-end gap-2 pt-1 border-t border-slate-100">
+                  <button onClick={() => openEditNetwork(n)} className="p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800 rounded-lg" title={`Editar ${n.name}`} aria-label={`Editar ${n.name}`}><Pencil className="w-4 h-4" /></button>
+                  <button onClick={() => handleDeleteNetwork(n)} className="p-2 text-red-500 hover:bg-red-50 hover:text-red-700 rounded-lg" title={`Excluir ${n.name}`} aria-label={`Excluir ${n.name}`}><Trash2 className="w-4 h-4" /></button>
+                </div>
               </div>
             );
           })}
@@ -272,9 +311,7 @@ export const StoresModule: React.FC = () => {
       {showStoreModal && (
         <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
-            <h3 className="text-xl font-bold text-slate-800">
-              {editingStoreId ? 'Editar Loja' : 'Cadastrar Nova Loja'}
-            </h3>
+            <h3 className="text-xl font-bold text-slate-800">{editingStoreId ? 'Editar Loja' : 'Cadastrar Nova Loja'}</h3>
             <form onSubmit={handleSaveStore} className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">Nome da Loja</label>
@@ -384,9 +421,7 @@ export const StoresModule: React.FC = () => {
       {showNetworkModal && (
         <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
-            <h3 className="text-xl font-bold text-slate-800">
-              {editingNetworkId ? 'Editar Rede de Lojas' : 'Cadastrar Rede de Lojas'}
-            </h3>
+            <h3 className="text-xl font-bold text-slate-800">{editingNetworkId ? 'Editar Rede de Lojas' : 'Cadastrar Rede de Lojas'}</h3>
             <form onSubmit={handleSaveNetwork} className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">Nome da Rede</label>

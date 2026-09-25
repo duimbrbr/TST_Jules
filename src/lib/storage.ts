@@ -79,11 +79,22 @@ export const LocalData = {
     if (index >= 0) networks[index] = newNetwork;
     else networks.push(newNetwork);
     setStoredItem(STORAGE_KEYS.NETWORKS, networks);
+
+    // Store the denormalized name together with the store so the local fallback
+    // remains consistent with the joined value returned by Supabase.
+    if (index >= 0) {
+      setStoredItem(STORAGE_KEYS.STORES, LocalData.getStores().map((store) => (
+        store.network_id === id ? { ...store, network_name: newNetwork.name } : store
+      )));
+    }
+
     return newNetwork;
   },
   deleteNetwork: (id: string) => {
-    const networks = LocalData.getNetworks().filter(n => n.id !== id);
-    setStoredItem(STORAGE_KEYS.NETWORKS, networks);
+    setStoredItem(STORAGE_KEYS.NETWORKS, LocalData.getNetworks().filter((network) => network.id !== id));
+    setStoredItem(STORAGE_KEYS.STORES, LocalData.getStores().map((store) => (
+      store.network_id === id ? { ...store, network_id: undefined, network_name: '' } : store
+    )));
   },
 
   getStores: (): Store[] => getStoredItem(STORAGE_KEYS.STORES, DEFAULT_STORES),
@@ -100,8 +111,7 @@ export const LocalData = {
     return newStore;
   },
   deleteStore: (id: string) => {
-    const stores = LocalData.getStores().filter(s => s.id !== id);
-    setStoredItem(STORAGE_KEYS.STORES, stores);
+    setStoredItem(STORAGE_KEYS.STORES, LocalData.getStores().filter((store) => store.id !== id));
   },
 
   getProducts: (): Product[] => getStoredItem(STORAGE_KEYS.PRODUCTS, DEFAULT_PRODUCTS),
@@ -116,8 +126,7 @@ export const LocalData = {
     return newProduct;
   },
   deleteProduct: (id: string) => {
-    const products = LocalData.getProducts().filter(p => p.id !== id);
-    setStoredItem(STORAGE_KEYS.PRODUCTS, products);
+    setStoredItem(STORAGE_KEYS.PRODUCTS, LocalData.getProducts().filter((product) => product.id !== id));
   },
 
   getLists: (): ShoppingList[] => getStoredItem(STORAGE_KEYS.LISTS, [

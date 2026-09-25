@@ -14,10 +14,11 @@ O **MercadoLista** é uma aplicação web progressiva (PWA) moderna, responsiva 
 - 📷 **Leitor de Código de Barras & Integração com Base Pública**:
   - Leitura de códigos de barras de produtos através da câmera do navegador (WebCam API).
   - Consulta e preenchimento automático de dados do produto via API pública **Open Food Facts**.
+  - Busca em duas etapas: consulta primeiro o catálogo brasileiro e, quando o código não é encontrado, consulta automaticamente o catálogo mundial.
 
 - 🏷️ **Cadastro de Produtos & Lojas**:
-  - **Produtos**: Cadastro com categoria, marca, unidade de medida, código de barras e **URL direta de foto** (evitando alto consumo de armazenamento em nuvem).
-  - **Lojas e Redes de Lojas**: Estrutura hierárquica conectando Lojas (*Zaffari Ipiranga, Carrefour Passo D'Areia, Panvel Moinhos*) a Redes de Lojas (*Rede Zaffari, Carrefour, Panvel*) com endereço, cidade, UF e tipo (*Supermercado, Farmácia, Padaria, etc.*).
+  - **Produtos**: Cadastro, edição e exclusão de produtos, com categoria, marca, unidade de medida, código de barras e **URL direta de foto** (evitando alto consumo de armazenamento em nuvem).
+  - **Lojas e Redes de Lojas**: Cadastro, edição e exclusão de lojas e redes; estrutura hierárquica conectando Lojas (*Zaffari Ipiranga, Carrefour Passo D'Areia, Panvel Moinhos*) a Redes de Lojas (*Rede Zaffari, Carrefour, Panvel*) com endereço, cidade, UF e tipo (*Supermercado, Farmácia, Padaria, etc.*).
 
 - 🧾 **Leitor de Notas Fiscais (NFC-e RS / SEFAZ)**:
   - Leitura de QR Code de notas fiscais de consumidor da SEFAZ-RS.
@@ -35,6 +36,28 @@ O **MercadoLista** é uma aplicação web progressiva (PWA) moderna, responsiva 
   - Estrutura de banco de dados PostgreSQL com script SQL completo e políticas de segurança por linha (RLS - *Row Level Security*).
   - Autenticação configurável com **Google SSO** e e-mail.
   - **Fallback automático para LocalStorage**: permite testar e utilizar todas as funções localmente no navegador mesmo sem credenciais ativas do Supabase.
+
+---
+
+## 🔎 Consulta de Produtos por Código de Barras
+
+Ao informar ou escanear um código de barras, o aplicativo consulta o Open Food Facts em sequência:
+
+1. **Catálogo brasileiro de produção**: `https://br.openfoodfacts.org/api/v3.6/product/{codigo}.json`.
+2. **Catálogo mundial de produção**: `https://world.openfoodfacts.org/api/v3.6/product/{codigo}.json`, usado automaticamente se o produto não estiver no catálogo brasileiro.
+
+As respostas solicitam somente os campos necessários para preencher o formulário, como nome, marca, ingredientes, nutrição, classificação Nutri-Score/NOVA e imagens. A mensagem exibida no formulário informa se o produto foi encontrado na base brasileira ou mundial. Se não houver resultado nas duas fontes, o cadastro manual continua disponível.
+
+> **Importante:** a consulta é feita pelo navegador. Por regras de segurança do browser, a aplicação não tenta definir manualmente o cabeçalho HTTP `User-Agent`; o navegador controla esse cabeçalho.
+
+---
+
+## ✏️ Edição e Exclusão de Cadastros
+
+- Em **Produtos**, use o ícone de lápis em um cartão para abrir o formulário preenchido e salvar a alteração. O ícone de lixeira pede confirmação antes de excluir o produto.
+- Em **Lojas e Redes**, os cartões de lojas e de redes também possuem ações de editar e excluir.
+- Ao excluir uma rede no modo LocalStorage, as lojas que pertenciam a ela são preservadas, mas ficam sem vínculo de rede. No Supabase, o schema aplica o mesmo comportamento por meio da relação configurada com `ON DELETE SET NULL`.
+- As ações usam o Supabase quando configurado; sem credenciais, são executadas somente no LocalStorage do navegador.
 
 ---
 

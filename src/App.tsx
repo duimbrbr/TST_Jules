@@ -23,6 +23,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<'lists' | 'products' | 'stores' | 'receipts' | 'reports'>('lists');
   const [user, setUser] = useState<UserProfile | null>(LocalData.getUser());
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
   const sharedToken = window.location.pathname.match(/^\/list\/([^/]+)$/)?.[1];
 
   useEffect(() => {
@@ -66,7 +67,6 @@ export default function App() {
 
   const handleLoginGoogle = async () => {
     setAuthError(null);
-
     if (isSupabaseConfigured && supabase) {
       try {
         const { error } = await supabase.auth.signInWithOAuth({
@@ -80,9 +80,10 @@ export default function App() {
           setAuthError(`Erro do Supabase: ${error.message}. Verifique a configuração do Provider Google no painel do Supabase.`);
           return;
         }
-      } catch (e: any) {
-        console.error('OAuth sign in exception:', e);
-        setAuthError(`Falha ao conectar: ${e?.message || 'Erro de rede ou configuração de OAuth.'}`);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Erro de rede ou configuração de OAuth.';
+        console.error('OAuth sign in exception:', error);
+        setAuthError(`Falha ao conectar: ${message}`);
         return;
       }
     } else {
@@ -283,8 +284,17 @@ export default function App() {
               <span>Continuar com o Google</span>
             </button>
 
+            {authError && (
+              <p className="text-xs text-red-600" role="alert">
+                {authError}
+              </p>
+            )}
+
             <button
-              onClick={() => setShowAuthModal(false)}
+              onClick={() => {
+                setAuthError(null);
+                setShowAuthModal(false);
+              }}
               className="text-xs text-slate-400 hover:text-slate-600 font-medium"
             >
               Cancelar
