@@ -17,14 +17,12 @@ export const StoresModule: React.FC = () => {
   const [address, setAddress] = useState('');
   const [city, setCity] = useState('');
   const [state, setState] = useState('RS');
-  const [editingStoreId, setEditingStoreId] = useState<string | null>(null);
 
   // Network Form State
   const [showNetworkModal, setShowNetworkModal] = useState(false);
   const [editingNetworkId, setEditingNetworkId] = useState<string | null>(null);
   const [networkName, setNetworkName] = useState('');
   const [networkDesc, setNetworkDesc] = useState('');
-  const [editingNetworkId, setEditingNetworkId] = useState<string | null>(null);
 
   const loadData = async () => {
     const fetchedStores = await SupabaseData.getStores();
@@ -36,24 +34,6 @@ export const StoresModule: React.FC = () => {
   useEffect(() => {
     loadData();
   }, []);
-
-  const handleEditStore = (store: Store) => {
-    setEditingStoreId(store.id);
-    setStoreName(store.name);
-    setStoreType(store.store_type || 'Supermercado');
-    setNetworkId(store.network_id || '');
-    setAddress(store.address || '');
-    setCity(store.city || '');
-    setState(store.state || 'RS');
-    setShowStoreModal(true);
-  };
-
-  const handleDeleteStore = async (id: string, sName: string) => {
-    if (window.confirm(`Tem certeza que deseja excluir a loja "${sName}"?`)) {
-      await SupabaseData.deleteStore(id);
-      await loadData();
-    }
-  };
 
   const handleSaveStore = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -81,7 +61,6 @@ export const StoresModule: React.FC = () => {
     setNetworkId('');
     setAddress('');
     setCity('');
-    setEditingStoreId(null);
   };
 
   const handleSaveNetwork = async (e: React.FormEvent) => {
@@ -103,7 +82,6 @@ export const StoresModule: React.FC = () => {
     setEditingNetworkId(null);
     setNetworkName('');
     setNetworkDesc('');
-    setEditingNetworkId(null);
   };
 
   const openEditStore = (store: Store) => {
@@ -222,14 +200,14 @@ export const StoresModule: React.FC = () => {
                       {s.store_type}
                     </span>
                     <button
-                      onClick={() => handleEditStore(s)}
+                      onClick={() => openEditStore(s)}
                       className="p-1 text-slate-400 hover:text-slate-700 transition"
                       title="Editar Loja"
                     >
-                      <Edit2 className="w-3.5 h-3.5" />
+                      <Pencil className="w-3.5 h-3.5" />
                     </button>
                     <button
-                      onClick={() => handleDeleteStore(s.id, s.name)}
+                      onClick={() => handleDeleteStore(s)}
                       className="p-1 text-slate-400 hover:text-red-600 transition"
                       title="Excluir Loja"
                     >
@@ -281,14 +259,14 @@ export const StoresModule: React.FC = () => {
                       {count} {count === 1 ? 'Loja' : 'Lojas'}
                     </span>
                     <button
-                      onClick={() => handleEditNetwork(n)}
+                      onClick={() => openEditNetwork(n)}
                       className="p-1 text-slate-400 hover:text-slate-700 transition"
                       title="Editar Rede"
                     >
-                      <Edit2 className="w-3.5 h-3.5" />
+                      <Pencil className="w-3.5 h-3.5" />
                     </button>
                     <button
-                      onClick={() => handleDeleteNetwork(n.id, n.name)}
+                      onClick={() => handleDeleteNetwork(n)}
                       className="p-1 text-slate-400 hover:text-red-600 transition"
                       title="Excluir Rede"
                     >
