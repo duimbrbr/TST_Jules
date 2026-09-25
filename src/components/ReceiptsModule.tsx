@@ -30,50 +30,16 @@ export const ReceiptsModule: React.FC = () => {
     loadData();
   }, []);
 
-  const parseSefazUrl = async (url: string) => {
+  const parseSefazUrl = (url: string) => {
     setScannedUrl(url);
-
-    let extractedKey = '';
     const match = url.match(/p=([0-9]{44})/);
-    if (match) {
-      extractedKey = match[1];
-    } else if (url.length === 44 && /^\d+$/.test(url)) {
-      extractedKey = url;
-    } else {
-      extractedKey = `43240${Math.floor(100000000000000 + Math.random() * 900000000000000)}`;
-    }
-
-    const store = stores[0] || { id: '', name: 'Zaffari Ipiranga', network_id: '', network_name: 'Rede Zaffari' };
-
-    const extractedItems: ReceiptItem[] = [
-      { id: `ri-${Date.now()}-1`, product_name: 'Leite Integral 1L', barcode: '7891000100103', quantity: 3, unit_price: 4.89, total_price: 14.67 },
-      { id: `ri-${Date.now()}-2`, product_name: 'Café Torrado e Moído 500g', barcode: '7891000241011', quantity: 1, unit_price: 19.90, total_price: 19.90 },
-      { id: `ri-${Date.now()}-3`, product_name: 'Pão de Forma Tradicional 500g', barcode: '7891000300015', quantity: 1, unit_price: 8.90, total_price: 8.90 },
-    ];
-
-    const total = extractedItems.reduce((acc, i) => acc + i.total_price, 0);
-
-    const newReceipt = await SupabaseData.saveReceipt({
-      user_id: '',
-      store_id: store.id,
-      store_name: store.name,
-      network_id: store.network_id,
-      network_name: store.network_name,
-      access_key: extractedKey,
-      url: url,
-      total_amount: total,
-      issue_date: new Date().toISOString(),
-      state: 'RS',
-      items: extractedItems,
-    });
-
-    await loadData();
-    setSelectedReceipt(newReceipt);
+    setAccessKey(match?.[1] || (/^\d{44}$/.test(url) ? url : ''));
+    setShowManualModal(true);
   };
 
-  const handleScanNFCe = async (scannedCode: string) => {
+  const handleScanNFCe = (scannedCode: string) => {
     setShowScanner(false);
-    await parseSefazUrl(scannedCode);
+    parseSefazUrl(scannedCode);
   };
 
   const handleManualReceipt = async (e: React.FormEvent) => {
@@ -98,6 +64,10 @@ export const ReceiptsModule: React.FC = () => {
       };
     });
 
+    const calculatedTotal = parsedItems.length > 0
+      ? parsedItems.reduce((sum, item) => sum + item.total_price, 0)
+      : parseFloat(totalAmount);
+
     await SupabaseData.saveReceipt({
       user_id: '',
       store_id: store?.id,
@@ -105,7 +75,7 @@ export const ReceiptsModule: React.FC = () => {
       network_id: store?.network_id,
       network_name: store?.network_name,
       access_key: accessKey || `43240${Math.floor(Math.random() * 100000000000000)}`,
-      total_amount: parseFloat(totalAmount),
+      total_amount: calculatedTotal,
       issue_date: new Date().toISOString(),
       state: 'RS',
       items: parsedItems.length > 0 ? parsedItems : [
@@ -125,7 +95,7 @@ export const ReceiptsModule: React.FC = () => {
         <div>
           <h2 className="text-2xl font-bold text-slate-800">Notas Fiscais (NFC-e RS)</h2>
           <p className="text-sm text-slate-500">
-            Escaneie o QR Code da nota fiscal do mercado para coletar os produtos e preços da SEFAZ.
+            Escaneie o QR Code para preencher a chave de acesso e confira os dados antes de registrar a nota manualmente.
           </p>
         </div>
 
@@ -242,6 +212,7 @@ export const ReceiptsModule: React.FC = () => {
         <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
             <h3 className="text-xl font-bold text-slate-800">Lançamento Manual de Nota Fiscal</h3>
+            {scannedUrl && <p className="text-xs text-slate-500">QR Code lido. Confira os dados antes de salvar; a consulta automática à SEFAZ não é realizada pelo navegador.</p>}
 
             <form onSubmit={handleManualReceipt} className="space-y-4">
               <div>

@@ -1,12 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { lazy, Suspense, useState, useEffect } from 'react';
 import { UserProfile } from './types';
 import { LocalData } from './lib/storage';
 import { supabase, isSupabaseConfigured } from './lib/supabase';
-import { ShoppingListsModule } from './components/ShoppingListsModule';
-import { ProductsModule } from './components/ProductsModule';
-import { StoresModule } from './components/StoresModule';
-import { ReceiptsModule } from './components/ReceiptsModule';
-import { ReportsModule } from './components/ReportsModule';
+const ShoppingListsModule = lazy(() => import('./components/ShoppingListsModule').then((module) => ({ default: module.ShoppingListsModule })));
+const ProductsModule = lazy(() => import('./components/ProductsModule').then((module) => ({ default: module.ProductsModule })));
+const StoresModule = lazy(() => import('./components/StoresModule').then((module) => ({ default: module.StoresModule })));
+const ReceiptsModule = lazy(() => import('./components/ReceiptsModule').then((module) => ({ default: module.ReceiptsModule })));
+const ReportsModule = lazy(() => import('./components/ReportsModule').then((module) => ({ default: module.ReportsModule })));
 import {
   ShoppingBag,
   Package,
@@ -23,7 +23,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<'lists' | 'products' | 'stores' | 'receipts' | 'reports'>('lists');
   const [user, setUser] = useState<UserProfile | null>(LocalData.getUser());
   const [showAuthModal, setShowAuthModal] = useState(false);
-  const [authError, setAuthError] = useState<string | null>(null);
+  const sharedToken = window.location.pathname.match(/^\/list\/([^/]+)$/)?.[1];
 
   useEffect(() => {
     if (isSupabaseConfigured && supabase) {
@@ -162,11 +162,13 @@ export default function App() {
 
       {/* Main Content Area */}
       <main className="max-w-6xl mx-auto px-4 py-6 flex-1 w-full">
-        {activeTab === 'lists' && <ShoppingListsModule />}
-        {activeTab === 'products' && <ProductsModule />}
-        {activeTab === 'stores' && <StoresModule />}
-        {activeTab === 'receipts' && <ReceiptsModule />}
-        {activeTab === 'reports' && <ReportsModule />}
+        <Suspense fallback={<p className="text-sm text-slate-500">Carregando módulo…</p>}>
+          {activeTab === 'lists' && <ShoppingListsModule sharedToken={sharedToken} />}
+          {activeTab === 'products' && <ProductsModule />}
+          {activeTab === 'stores' && <StoresModule />}
+          {activeTab === 'receipts' && <ReceiptsModule />}
+          {activeTab === 'reports' && <ReportsModule />}
+        </Suspense>
       </main>
 
       {/* Bottom Navigation Bar (Mobile) / Tab Bar (Desktop) */}
