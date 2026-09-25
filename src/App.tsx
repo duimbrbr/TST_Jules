@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { UserProfile } from './types';
 import { LocalData } from './lib/storage';
+import { supabase, isSupabaseConfigured } from './lib/supabase';
 import { ShoppingListsModule } from './components/ShoppingListsModule';
 import { ProductsModule } from './components/ProductsModule';
 import { StoresModule } from './components/StoresModule';
@@ -15,8 +16,6 @@ import {
   LogIn,
   LogOut,
   User,
-  Smartphone,
-  CheckCircle2,
 } from 'lucide-react';
 
 export default function App() {
@@ -24,19 +23,76 @@ export default function App() {
   const [user, setUser] = useState<UserProfile | null>(LocalData.getUser());
   const [showAuthModal, setShowAuthModal] = useState(false);
 
-  const handleLoginGoogle = () => {
-    const googleUser: UserProfile = {
-      id: `usr-google-${Date.now()}`,
-      email: 'usuario.google@gmail.com',
-      full_name: 'Usuário Google',
-      avatar_url: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
-    };
-    LocalData.setUser(googleUser);
-    setUser(googleUser);
+  useEffect(() => {
+    if (isSupabaseConfigured && supabase) {
+      // Check current active Supabase session
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (session?.user) {
+          const supabaseUser: UserProfile = {
+            id: session.user.id,
+            email: session.user.email || '',
+            full_name: session.user.user_metadata?.full_name || session.user.email,
+            avatar_url: session.user.user_metadata?.avatar_url,
+          };
+          setUser(supabaseUser);
+          LocalData.setUser(supabaseUser);
+        }
+      });
+
+      // Listen for OAuth / Auth state changes
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+        if (session?.user) {
+          const supabaseUser: UserProfile = {
+            id: session.user.id,
+            email: session.user.email || '',
+            full_name: session.user.user_metadata?.full_name || session.user.email,
+            avatar_url: session.user.user_metadata?.avatar_url,
+          };
+          setUser(supabaseUser);
+          LocalData.setUser(supabaseUser);
+        } else {
+          setUser(null);
+          LocalData.setUser(null);
+        }
+      });
+
+      return () => {
+        subscription.unsubscribe();
+      };
+    }
+  }, []);
+
+  const handleLoginGoogle = async () => {
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const { error } = await supabase.auth.signInWithOAuth({
+          provider: 'google',
+          options: {
+            redirectTo: window.location.origin,
+          },
+        });
+        if (error) console.error('Error signing in with Google SSO:', error);
+      } catch (e) {
+        console.error('OAuth sign in exception:', e);
+      }
+    } else {
+      // Simulation for local development without Supabase keys
+      const googleUser: UserProfile = {
+        id: `usr-google-${Date.now()}`,
+        email: 'usuario.google@gmail.com',
+        full_name: 'Usuário Google',
+        avatar_url: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
+      };
+      LocalData.setUser(googleUser);
+      setUser(googleUser);
+    }
     setShowAuthModal(false);
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    if (isSupabaseConfigured && supabase) {
+      await supabase.auth.signOut();
+    }
     LocalData.setUser(null);
     setUser(null);
   };

@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Product } from '../types';
-import { LocalData } from '../lib/storage';
+import { SupabaseData } from '../lib/supabaseData';
 import { BarcodeScannerModal } from './BarcodeScannerModal';
 import { fetchProductByBarcode } from '../services/openFoodFactsService';
 import {
@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 
 export const ProductsModule: React.FC = () => {
-  const [products, setProducts] = useState<Product[]>(LocalData.getProducts());
+  const [products, setProducts] = useState<Product[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('Todas');
 
@@ -31,6 +31,15 @@ export const ProductsModule: React.FC = () => {
   const [failedImageIds, setFailedImageIds] = useState<Set<string>>(new Set());
 
   const categories = ['Todas', 'Laticínios', 'Mercearia', 'Padaria', 'Higiene', 'Limpeza', 'Hortifruti', 'Bebidas', 'Outros'];
+
+  const loadProducts = async () => {
+    const fetched = await SupabaseData.getProducts();
+    setProducts(fetched);
+  };
+
+  useEffect(() => {
+    loadProducts();
+  }, []);
 
   const lookupBarcode = async (codeToLookup: string) => {
     if (!codeToLookup.trim()) return;
@@ -62,11 +71,11 @@ export const ProductsModule: React.FC = () => {
     await lookupBarcode(scannedCode);
   };
 
-  const handleSaveProduct = (e: React.FormEvent) => {
+  const handleSaveProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
 
-    LocalData.saveProduct({
+    await SupabaseData.saveProduct({
       name,
       brand: brand || undefined,
       barcode: barcode || undefined,
@@ -75,7 +84,7 @@ export const ProductsModule: React.FC = () => {
       image_url: imageUrl || undefined,
     });
 
-    setProducts(LocalData.getProducts());
+    await loadProducts();
     setShowProductModal(false);
     resetForm();
   };

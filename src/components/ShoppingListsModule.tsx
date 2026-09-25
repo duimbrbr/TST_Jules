@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ShoppingList, ShoppingListItem, Product, Store } from '../types';
-import { LocalData } from '../lib/storage';
+import { SupabaseData } from '../lib/supabaseData';
 import { BarcodeScannerModal } from './BarcodeScannerModal';
 import { fetchProductByBarcode } from '../services/openFoodFactsService';
 import {
@@ -10,11 +10,11 @@ import {
 import confetti from 'canvas-confetti';
 
 export const ShoppingListsModule: React.FC = () => {
-  const [lists, setLists] = useState<ShoppingList[]>(LocalData.getLists());
+  const [lists, setLists] = useState<ShoppingList[]>([]);
   const [selectedList, setSelectedList] = useState<ShoppingList | null>(null);
   const [items, setItems] = useState<ShoppingListItem[]>([]);
-  const [products, setProducts] = useState<Product[]>(LocalData.getProducts());
-  const [stores] = useState<Store[]>(LocalData.getStores());
+  const [products, setProducts] = useState<Product[]>([]);
+  const [stores, setStores] = useState<Store[]>([]);
 
   // Modal States
   const [showNewListModal, setShowNewListModal] = useState(false);
@@ -41,36 +41,50 @@ export const ShoppingListsModule: React.FC = () => {
   const [itemCategory, setItemCategory] = useState('Mercearia');
   const [itemStoreId, setItemStoreId] = useState('');
 
+  const loadInitialData = async () => {
+    const fetchedLists = await SupabaseData.getLists();
+    const fetchedProducts = await SupabaseData.getProducts();
+    const fetchedStores = await SupabaseData.getStores();
+
+    setLists(fetchedLists);
+    setProducts(fetchedProducts);
+    setStores(fetchedStores);
+  };
+
+  useEffect(() => {
+    loadInitialData();
+  }, []);
+
   useEffect(() => {
     if (selectedList) {
-      setItems(LocalData.getListItems(selectedList.id));
+      SupabaseData.getListItems(selectedList.id).then(setItems);
     }
   }, [selectedList]);
 
-  const handleCreateList = (e: React.FormEvent) => {
+  const handleCreateList = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!listTitle.trim()) return;
 
-    const user = LocalData.getUser();
-    const newList = LocalData.saveList({
-      owner_id: user?.id || 'usr-demo',
+    const newList = await SupabaseData.saveList({
+      owner_id: '',
       title: listTitle,
       description: listDesc,
       budget: parseFloat(listBudget) || 0,
     });
 
-    setLists(LocalData.getLists());
+    const refreshedLists = await SupabaseData.getLists();
+    setLists(refreshedLists);
     setSelectedList(newList);
     setShowNewListModal(false);
     setListTitle('');
     setListDesc('');
   };
 
-  const handleAddItem = (e: React.FormEvent) => {
+  const handleAddItem = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedList || !itemName.trim()) return;
 
-    LocalData.saveListItem({
+    await SupabaseData.saveListItem({
       list_id: selectedList.id,
       product_id: selectedProductId || undefined,
       product_name: itemName,
@@ -82,7 +96,8 @@ export const ShoppingListsModule: React.FC = () => {
       is_checked: false,
     });
 
-    setItems(LocalData.getListItems(selectedList.id));
+    const refreshedItems = await SupabaseData.getListItems(selectedList.id);
+    setItems(refreshedItems);
     setShowItemModal(false);
     resetItemForm();
   };
@@ -114,7 +129,7 @@ export const ShoppingListsModule: React.FC = () => {
     setIsLoadingApi(true);
     setApiMessage({ text: 'Buscando dados na base Open Food Facts v3...', type: 'info' });
 
-    // Check if product already exists locally first
+    // Check if product already exists locally/database first
     const existingProd = products.find((p) => p.barcode === codeToLookup.trim());
     if (existingProd) {
       setSelectedProductId(existingProd.id);
@@ -136,8 +151,8 @@ export const ShoppingListsModule: React.FC = () => {
       setItemName(fullName);
       setItemBarcode(codeToLookup);
 
-      // Auto-save new product to local registry
-      const newProd = LocalData.saveProduct({
+      // Auto-save new product to registry
+      const newProd = await SupabaseData.saveProduct({
         barcode: codeToLookup,
         name: fullName,
         brand: p.brands || undefined,
@@ -146,7 +161,8 @@ export const ShoppingListsModule: React.FC = () => {
         image_url: p.image_front_url || p.image_front_small_url || undefined,
       });
 
-      setProducts(LocalData.getProducts());
+      const refreshedProds = await SupabaseData.getProducts();
+      setProducts(refreshedProds);
       setSelectedProductId(newProd.id);
       setApiMessage({ text: response.message, type: 'success' });
     } else {
@@ -162,13 +178,13 @@ export const ShoppingListsModule: React.FC = () => {
     await lookupBarcodeInOpenFoodFacts(scannedCode);
   };
 
-  const toggleItemCheck = (item: ShoppingListItem) => {
-    LocalData.saveListItem({
+  const toggleItemCheck = async (item: ShoppingListItem) => {
+    await SupabaseData.saveListItem({
       ...item,
       is_checked: !item.is_checked,
     });
 
-    const newItems = LocalData.getListItems(item.list_id);
+    const newItems = await SupabaseData.getListItems(item.list_id);
     setItems(newItems);
 
     // Celebrate if all items checked
@@ -177,15 +193,17 @@ export const ShoppingListsModule: React.FC = () => {
     }
   };
 
-  const handleDeleteItem = (itemId: string) => {
+  const handleDeleteItem = async (itemId: string) => {
     if (!selectedList) return;
-    LocalData.deleteListItem(itemId);
-    setItems(LocalData.getListItems(selectedList.id));
+    await SupabaseData.deleteListItem(itemId);
+    const refreshedItems = await SupabaseData.getListItems(selectedList.id);
+    setItems(refreshedItems);
   };
 
-  const handleDeleteList = (listId: string) => {
-    LocalData.deleteList(listId);
-    setLists(LocalData.getLists());
+  const handleDeleteList = async (listId: string) => {
+    await SupabaseData.deleteList(listId);
+    const refreshedLists = await SupabaseData.getLists();
+    setLists(refreshedLists);
     setSelectedList(null);
   };
 
@@ -239,7 +257,7 @@ export const ShoppingListsModule: React.FC = () => {
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {lists.map((list) => {
-              const listItems = LocalData.getListItems(list.id);
+              const listItems = items.filter((i) => i.list_id === list.id);
               const itemsCount = listItems.length;
               const completedCount = listItems.filter((i) => i.is_checked).length;
               const totalSpent = listItems
@@ -286,7 +304,7 @@ export const ShoppingListsModule: React.FC = () => {
                     </div>
 
                     <div className="flex items-center justify-between pt-1 text-xs">
-                      <span className="text-slate-500">Orçamento: R$ {list.budget.toFixed(2)}</span>
+                      <span className="text-slate-500">Orçamento: R$ {Number(list.budget || 0).toFixed(2)}</span>
                       <span className="font-bold text-green-700">Gasto: R$ {totalSpent.toFixed(2)}</span>
                     </div>
                   </div>
@@ -345,7 +363,7 @@ export const ShoppingListsModule: React.FC = () => {
             <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between">
               <div>
                 <p className="text-xs text-slate-500 font-medium">Orçamento da Lista</p>
-                <p className="text-lg font-bold text-slate-800">R$ {selectedList.budget.toFixed(2)}</p>
+                <p className="text-lg font-bold text-slate-800">R$ {Number(selectedList.budget || 0).toFixed(2)}</p>
               </div>
               <div className="p-3 bg-blue-50 text-blue-600 rounded-xl">
                 <DollarSign className="w-5 h-5" />
@@ -413,14 +431,14 @@ export const ShoppingListsModule: React.FC = () => {
                           {item.product_name}
                         </p>
                         <p className="text-xs text-slate-500">
-                          {item.quantity} x R$ {item.actual_price.toFixed(2)} | {item.category}
+                          {item.quantity} x R$ {Number(item.actual_price || 0).toFixed(2)} | {item.category}
                         </p>
                       </div>
                     </div>
 
                     <div className="flex items-center space-x-3">
                       <span className={`font-bold text-sm ${item.is_checked ? 'text-green-600' : 'text-slate-700'}`}>
-                        R$ {(item.quantity * item.actual_price).toFixed(2)}
+                        R$ {(item.quantity * Number(item.actual_price || 0)).toFixed(2)}
                       </span>
                       <button
                         onClick={() => handleDeleteItem(item.id)}
