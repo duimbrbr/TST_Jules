@@ -22,6 +22,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<'lists' | 'products' | 'stores' | 'receipts' | 'reports'>('lists');
   const [user, setUser] = useState<UserProfile | null>(LocalData.getUser());
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
   const sharedToken = window.location.pathname.match(/^\/list\/([^/]+)$/)?.[1];
 
   useEffect(() => {
@@ -64,6 +65,7 @@ export default function App() {
   }, []);
 
   const handleLoginGoogle = async () => {
+    setAuthError(null);
     if (isSupabaseConfigured && supabase) {
       try {
         const { error } = await supabase.auth.signInWithOAuth({
@@ -72,9 +74,13 @@ export default function App() {
             redirectTo: window.location.origin,
           },
         });
-        if (error) console.error('Error signing in with Google SSO:', error);
+        if (error) {
+          console.error('Error signing in with Google SSO:', error);
+          setAuthError('Não foi possível iniciar o login com o Google. Tente novamente.');
+        }
       } catch (e) {
         console.error('OAuth sign in exception:', e);
+        setAuthError('Não foi possível iniciar o login com o Google. Tente novamente.');
       }
     } else {
       // Simulation for local development without Supabase keys
@@ -261,8 +267,17 @@ export default function App() {
               <span>Continuar com o Google</span>
             </button>
 
+            {authError && (
+              <p className="text-xs text-red-600" role="alert">
+                {authError}
+              </p>
+            )}
+
             <button
-              onClick={() => setShowAuthModal(false)}
+              onClick={() => {
+                setAuthError(null);
+                setShowAuthModal(false);
+              }}
               className="text-xs text-slate-400 hover:text-slate-600 font-medium"
             >
               Cancelar
