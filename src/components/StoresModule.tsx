@@ -10,6 +10,7 @@ export const StoresModule: React.FC = () => {
 
   // Store Form State
   const [showStoreModal, setShowStoreModal] = useState(false);
+  const [editingStoreId, setEditingStoreId] = useState<string | null>(null);
   const [storeName, setStoreName] = useState('');
   const [storeType, setStoreType] = useState('Supermercado');
   const [networkId, setNetworkId] = useState('');
@@ -20,6 +21,7 @@ export const StoresModule: React.FC = () => {
 
   // Network Form State
   const [showNetworkModal, setShowNetworkModal] = useState(false);
+  const [editingNetworkId, setEditingNetworkId] = useState<string | null>(null);
   const [networkName, setNetworkName] = useState('');
   const [networkDesc, setNetworkDesc] = useState('');
   const [editingNetworkId, setEditingNetworkId] = useState<string | null>(null);
@@ -34,6 +36,24 @@ export const StoresModule: React.FC = () => {
   useEffect(() => {
     loadData();
   }, []);
+
+  const handleEditStore = (store: Store) => {
+    setEditingStoreId(store.id);
+    setStoreName(store.name);
+    setStoreType(store.store_type || 'Supermercado');
+    setNetworkId(store.network_id || '');
+    setAddress(store.address || '');
+    setCity(store.city || '');
+    setState(store.state || 'RS');
+    setShowStoreModal(true);
+  };
+
+  const handleDeleteStore = async (id: string, sName: string) => {
+    if (window.confirm(`Tem certeza que deseja excluir a loja "${sName}"?`)) {
+      await SupabaseData.deleteStore(id);
+      await loadData();
+    }
+  };
 
   const handleSaveStore = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,7 +71,14 @@ export const StoresModule: React.FC = () => {
 
     await loadData();
     setShowStoreModal(false);
+    resetStoreForm();
+  };
+
+  const resetStoreForm = () => {
+    setEditingStoreId(null);
     setStoreName('');
+    setStoreType('Supermercado');
+    setNetworkId('');
     setAddress('');
     setCity('');
     setEditingStoreId(null);
@@ -69,6 +96,11 @@ export const StoresModule: React.FC = () => {
 
     await loadData();
     setShowNetworkModal(false);
+    resetNetworkForm();
+  };
+
+  const resetNetworkForm = () => {
+    setEditingNetworkId(null);
     setNetworkName('');
     setNetworkDesc('');
     setEditingNetworkId(null);
@@ -181,13 +213,29 @@ export const StoresModule: React.FC = () => {
       {activeTab === 'stores' && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {stores.map((s) => (
-            <div key={s.id} className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm hover:shadow-md transition flex flex-col justify-between space-y-3">
+            <div key={s.id} className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm hover:shadow-md transition flex flex-col justify-between space-y-3 group">
               <div>
                 <div className="flex items-start justify-between">
                   <h3 className="font-bold text-slate-800 text-lg">{s.name}</h3>
-                  <span className="bg-green-50 text-green-700 text-xs px-2.5 py-1 rounded-full font-medium border border-green-200">
-                    {s.store_type}
-                  </span>
+                  <div className="flex items-center space-x-2">
+                    <span className="bg-green-50 text-green-700 text-xs px-2.5 py-1 rounded-full font-medium border border-green-200">
+                      {s.store_type}
+                    </span>
+                    <button
+                      onClick={() => handleEditStore(s)}
+                      className="p-1 text-slate-400 hover:text-slate-700 transition"
+                      title="Editar Loja"
+                    >
+                      <Edit2 className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteStore(s.id, s.name)}
+                      className="p-1 text-slate-400 hover:text-red-600 transition"
+                      title="Excluir Loja"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
                 {s.network_name && (
                   <p className="text-xs font-semibold text-slate-500 mt-1 flex items-center space-x-1">
@@ -228,9 +276,25 @@ export const StoresModule: React.FC = () => {
                     <Building2 className="w-5 h-5 text-green-600" />
                     <span>{n.name}</span>
                   </h3>
-                  <span className="text-xs bg-slate-100 text-slate-600 px-2.5 py-1 rounded-full font-medium">
-                    {count} {count === 1 ? 'Loja' : 'Lojas'}
-                  </span>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-xs bg-slate-100 text-slate-600 px-2.5 py-1 rounded-full font-medium">
+                      {count} {count === 1 ? 'Loja' : 'Lojas'}
+                    </span>
+                    <button
+                      onClick={() => handleEditNetwork(n)}
+                      className="p-1 text-slate-400 hover:text-slate-700 transition"
+                      title="Editar Rede"
+                    >
+                      <Edit2 className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteNetwork(n.id, n.name)}
+                      className="p-1 text-slate-400 hover:text-red-600 transition"
+                      title="Excluir Rede"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
                 <p className="text-xs text-slate-500">{n.description || 'Sem descrição cadastrada.'}</p>
                 <div className="flex justify-end gap-2 pt-1 border-t border-slate-100">
@@ -243,7 +307,7 @@ export const StoresModule: React.FC = () => {
         </div>
       )}
 
-      {/* Add Store Modal */}
+      {/* Add / Edit Store Modal */}
       {showStoreModal && (
         <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
@@ -333,7 +397,10 @@ export const StoresModule: React.FC = () => {
               <div className="flex items-center justify-end space-x-3 pt-3">
                 <button
                   type="button"
-                  onClick={() => setShowStoreModal(false)}
+                  onClick={() => {
+                    setShowStoreModal(false);
+                    resetStoreForm();
+                  }}
                   className="px-4 py-2 rounded-xl text-slate-600 text-sm font-medium hover:bg-slate-100"
                 >
                   Cancelar
@@ -342,7 +409,7 @@ export const StoresModule: React.FC = () => {
                   type="submit"
                   className="px-5 py-2 rounded-xl bg-green-600 text-white text-sm font-medium hover:bg-green-700 shadow-sm"
                 >
-                  Salvar Loja
+                  {editingStoreId ? 'Salvar Alterações' : 'Salvar Loja'}
                 </button>
               </div>
             </form>
@@ -350,7 +417,7 @@ export const StoresModule: React.FC = () => {
         </div>
       )}
 
-      {/* Add Network Modal */}
+      {/* Add / Edit Network Modal */}
       {showNetworkModal && (
         <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
@@ -381,7 +448,10 @@ export const StoresModule: React.FC = () => {
               <div className="flex items-center justify-end space-x-3 pt-3">
                 <button
                   type="button"
-                  onClick={() => setShowNetworkModal(false)}
+                  onClick={() => {
+                    setShowNetworkModal(false);
+                    resetNetworkForm();
+                  }}
                   className="px-4 py-2 rounded-xl text-slate-600 text-sm font-medium hover:bg-slate-100"
                 >
                   Cancelar
@@ -390,7 +460,7 @@ export const StoresModule: React.FC = () => {
                   type="submit"
                   className="px-5 py-2 rounded-xl bg-green-600 text-white text-sm font-medium hover:bg-green-700 shadow-sm"
                 >
-                  Salvar Rede
+                  {editingNetworkId ? 'Salvar Alterações' : 'Salvar Rede'}
                 </button>
               </div>
             </form>

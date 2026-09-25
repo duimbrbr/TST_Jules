@@ -16,6 +16,7 @@ import {
   LogIn,
   LogOut,
   User,
+  AlertCircle,
 } from 'lucide-react';
 
 export default function App() {
@@ -86,11 +87,14 @@ export default function App() {
         return;
       }
     } else {
-      // Simulation for local development without Supabase keys
+      // Alert user if Supabase environment variables are missing
+      setAuthError('Supabase não configurado. Certifique-se de preencher VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY na Vercel e fazer Redeploy.');
+
+      // Simulation fallback for local dev
       const googleUser: UserProfile = {
         id: `usr-google-${Date.now()}`,
         email: 'usuario.google@gmail.com',
-        full_name: 'Usuário Google',
+        full_name: 'Usuário Google (Modo Demo)',
         avatar_url: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
       };
       LocalData.setUser(googleUser);
@@ -143,7 +147,10 @@ export default function App() {
               </div>
             ) : (
               <button
-                onClick={() => setShowAuthModal(true)}
+                onClick={() => {
+                  setAuthError(null);
+                  setShowAuthModal(true);
+                }}
                 className="flex items-center space-x-1.5 bg-green-600 hover:bg-green-700 text-white font-medium text-xs px-3.5 py-2 rounded-xl transition shadow-sm"
               >
                 <LogIn className="w-4 h-4" />
@@ -244,6 +251,13 @@ export default function App() {
                 Acesse suas listas compartilhadas e relatórios de gastos em qualquer dispositivo.
               </p>
             </div>
+
+            {authError && (
+              <div className="p-3 bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded-xl flex items-start space-x-2 text-left">
+                <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5 text-amber-600" />
+                <span>{authError}</span>
+              </div>
+            )}
 
             <button
               onClick={handleLoginGoogle}

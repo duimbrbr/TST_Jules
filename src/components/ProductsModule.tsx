@@ -15,6 +15,7 @@ export const ProductsModule: React.FC = () => {
 
   // Modal and Scanner State
   const [showProductModal, setShowProductModal] = useState(false);
+  const [editingProductId, setEditingProductId] = useState<string | null>(null);
   const [showScanner, setShowScanner] = useState(false);
   const [isLoadingApi, setIsLoadingApi] = useState(false);
   const [apiMessage, setApiMessage] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
@@ -72,6 +73,24 @@ export const ProductsModule: React.FC = () => {
     await lookupBarcode(scannedCode);
   };
 
+  const handleEditProduct = (prod: Product) => {
+    setEditingProductId(prod.id);
+    setName(prod.name);
+    setBrand(prod.brand || '');
+    setBarcode(prod.barcode || '');
+    setCategory(prod.category || 'Mercearia');
+    setUnit(prod.unit || 'un');
+    setImageUrl(prod.image_url || '');
+    setShowProductModal(true);
+  };
+
+  const handleDeleteProduct = async (id: string, prodName: string) => {
+    if (window.confirm(`Tem certeza que deseja excluir o produto "${prodName}"?`)) {
+      await SupabaseData.deleteProduct(id);
+      await loadProducts();
+    }
+  };
+
   const handleSaveProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
@@ -92,6 +111,7 @@ export const ProductsModule: React.FC = () => {
   };
 
   const resetForm = () => {
+    setEditingProductId(null);
     setName('');
     setBrand('');
     setBarcode('');
@@ -207,7 +227,7 @@ export const ProductsModule: React.FC = () => {
           return (
             <div
               key={p.id}
-              className="bg-white rounded-2xl border border-slate-200/80 shadow-sm hover:shadow-md transition overflow-hidden flex flex-col justify-between"
+              className="bg-white rounded-2xl border border-slate-200/80 shadow-sm hover:shadow-md transition overflow-hidden flex flex-col justify-between group"
             >
               <div className="relative aspect-video bg-slate-100 flex items-center justify-center overflow-hidden border-b border-slate-100">
                 {p.image_url && !hasFailedImage ? (
@@ -226,6 +246,23 @@ export const ProductsModule: React.FC = () => {
                 <span className="absolute top-2 right-2 bg-slate-900/70 backdrop-blur-md text-white text-[10px] font-semibold px-2 py-0.5 rounded-full">
                   {p.category}
                 </span>
+
+                <div className="absolute top-2 left-2 flex items-center space-x-1 opacity-90 sm:opacity-0 group-hover:opacity-100 transition">
+                  <button
+                    onClick={() => handleEditProduct(p)}
+                    className="p-1.5 bg-white/90 hover:bg-white text-slate-700 rounded-lg shadow-sm"
+                    title="Editar Produto"
+                  >
+                    <Edit2 className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    onClick={() => handleDeleteProduct(p.id, p.name)}
+                    className="p-1.5 bg-white/90 hover:bg-white text-red-600 rounded-lg shadow-sm"
+                    title="Excluir Produto"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
 
               <div className="p-4 space-y-2 flex-1 flex flex-col justify-between">
@@ -264,7 +301,7 @@ export const ProductsModule: React.FC = () => {
         />
       )}
 
-      {/* Add Product Modal */}
+      {/* Add / Edit Product Modal */}
       {showProductModal && (
         <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
@@ -426,7 +463,7 @@ export const ProductsModule: React.FC = () => {
                   type="submit"
                   className="px-5 py-2 rounded-xl bg-green-600 text-white text-sm font-medium hover:bg-green-700 shadow-sm"
                 >
-                  Salvar Produto
+                  {editingProductId ? 'Salvar Alterações' : 'Salvar Produto'}
                 </button>
               </div>
             </form>
