@@ -76,11 +76,14 @@ export default function App() {
         });
         if (error) {
           console.error('Error signing in with Google SSO:', error);
-          setAuthError('Não foi possível iniciar o login com o Google. Tente novamente.');
+          setAuthError(`Erro do Supabase: ${error.message}. Verifique a configuração do Provider Google no painel do Supabase.`);
+          return;
         }
-      } catch (e) {
-        console.error('OAuth sign in exception:', e);
-        setAuthError('Não foi possível iniciar o login com o Google. Tente novamente.');
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Erro de rede ou configuração de OAuth.';
+        console.error('OAuth sign in exception:', error);
+        setAuthError(`Falha ao conectar: ${message}`);
+        return;
       }
     } else {
       // Simulation for local development without Supabase keys
