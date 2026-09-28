@@ -20,10 +20,10 @@ O **MercadoLista** é uma aplicação web progressiva (PWA) moderna, responsiva 
   - **Produtos**: Cadastro, edição e exclusão de produtos, com categoria, marca, unidade de medida, código de barras e **URL direta de foto** (evitando alto consumo de armazenamento em nuvem).
   - **Lojas e Redes de Lojas**: Cadastro, edição e exclusão de lojas e redes; estrutura hierárquica conectando Lojas (*Zaffari Ipiranga, Carrefour Passo D'Areia, Panvel Moinhos*) a Redes de Lojas (*Rede Zaffari, Carrefour, Panvel*) com endereço, cidade, UF e tipo (*Supermercado, Farmácia, Padaria, etc.*).
 
-- 🧾 **Leitor de Notas Fiscais (NFC-e RS / SEFAZ)**:
-  - Leitura de QR Code de notas fiscais de consumidor da SEFAZ-RS.
-  - Extrator de produtos, quantidades e preços unitários contidos na nota fiscal.
-  - Formulário para lançamento manual de notas fiscais com suporte a digitação por linha.
+- 🧾 **Leitor de Notas Fiscais (NFC-e / SEFAZ)**:
+  - Leitura de QR Code de notas fiscais de consumidor e consulta ao portal público da SEFAZ de **São Paulo (SP)** e do **Rio de Janeiro (RJ)**.
+  - Extrator de produtos, quantidades e preços unitários quando a página pública da NFC-e disponibiliza os dados.
+  - Formulário para conferência e lançamento manual, usado também quando a SEFAZ solicitar validação adicional ou não disponibilizar itens legíveis.
 
 - 📊 **Controle de Gastos e Comparação de Preços**:
   - **Comparação de Preços por Loja**: Tabela comparativa do valor do mesmo produto em lojas distintas (*indica onde o produto está mais barato*).
