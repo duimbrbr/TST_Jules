@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Receipt, ReceiptItem, Store } from '../types';
 import { SupabaseData } from '../lib/supabaseData';
 import { BarcodeScannerModal } from './BarcodeScannerModal';
-import { consultSefazReceipt } from '../services/sefazService';
+import { consultSefazReceipt, consultSefazReceiptByKey, SefazReceiptLookup } from '../services/sefazService';
 import { QrCode, Plus, Calendar, Loader2, AlertCircle } from 'lucide-react';
 
 export const ReceiptsModule: React.FC = () => {
@@ -43,17 +43,24 @@ export const ReceiptsModule: React.FC = () => {
   const handleScanNFCe = async (scannedCode: string) => {
     setShowScanner(false);
     parseSefazUrl(scannedCode);
+    await consultReceipt(() => consultSefazReceipt(scannedCode));
+  };
+
+  const applyConsultedReceipt = (receipt: SefazReceiptLookup) => {
+    setReceiptState(receipt.state);
+    setTotalAmount(receipt.totalAmount.toFixed(2));
+    setItemsText(receipt.items.map((item) => (
+      `${item.product_name} | ${item.quantity} | ${item.unit_price.toFixed(2)}`
+    )).join('\n'));
+    setConsultationMessage(`Nota consultada com sucesso na SEFAZ-${receipt.state}. Confira os dados antes de salvar.`);
+  };
+
+  const consultReceipt = async (lookup: () => Promise<SefazReceiptLookup>) => {
     setConsultationMessage(null);
     setIsConsulting(true);
 
     try {
-      const receipt = await consultSefazReceipt(scannedCode);
-      setReceiptState(receipt.state);
-      setTotalAmount(receipt.totalAmount.toFixed(2));
-      setItemsText(receipt.items.map((item) => (
-        `${item.product_name} | ${item.quantity} | ${item.unit_price.toFixed(2)}`
-      )).join('\n'));
-      setConsultationMessage(`Nota consultada com sucesso na SEFAZ-${receipt.state}. Confira os dados antes de salvar.`);
+      applyConsultedReceipt(await lookup());
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Não foi possível consultar a NFC-e na SEFAZ.';
       setConsultationMessage(message);
@@ -296,7 +303,19 @@ export const ReceiptsModule: React.FC = () => {
                     placeholder="Chave NFC-e de 44 dígitos"
                     className="min-w-0 flex-1 px-3.5 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-green-500 text-sm font-mono"
                   />
-                  <button type="button" onClick={handleConsultAccessKey} disabled={isConsulting} className="px-3 py-2 rounded-xl bg-slate-800 text-white text-xs font-semibold hover:bg-slate-900 disabled:opacity-50">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const key = accessKey.replace(/\D/g, '');
+                      if (key.length !== 44) {
+                        setConsultationMessage('Digite uma chave de acesso NFC-e válida, com 44 dígitos, para consultar a SEFAZ.');
+                        return;
+                      }
+                      void consultReceipt(() => consultSefazReceiptByKey(key));
+                    }}
+                    disabled={isConsulting}
+                    className="px-3 py-2 rounded-xl bg-slate-800 text-white text-xs font-semibold hover:bg-slate-900 disabled:opacity-50"
+                  >
                     Consultar chave
                   </button>
                 </div>
