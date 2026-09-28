@@ -22,6 +22,7 @@ O **MercadoLista** é uma aplicação web progressiva (PWA) moderna, responsiva 
 
 - 🧾 **Leitor de Notas Fiscais (NFC-e / SEFAZ)**:
   - Leitura de QR Code **ou digitação da chave de acesso de 44 dígitos** para consultar o portal público da SEFAZ de **São Paulo (SP)** e do **Rio de Janeiro (RJ)**.
+  - Para NFC-e do Rio de Janeiro, a consulta usa o portal oficial `www.fazenda.rj.gov.br/nfce/consulta`.
   - Extrator de produtos, quantidades e preços unitários quando a página pública da NFC-e disponibiliza os dados.
   - Formulário para conferência e lançamento manual, usado também quando a SEFAZ solicitar validação adicional ou não disponibilizar itens legíveis.
 

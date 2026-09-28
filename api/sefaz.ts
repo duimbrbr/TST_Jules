@@ -7,13 +7,14 @@ type ReceiptItem = {
 
 const SUPPORTED_HOSTS = new Set([
   'www.nfce.fazenda.sp.gov.br',
+  'www.fazenda.rj.gov.br',
   'www4.fazenda.rj.gov.br',
 ]);
 
 const STATE_BY_KEY_PREFIX: Record<string, 'SP' | 'RJ'> = { '35': 'SP', '33': 'RJ' };
 const KEY_CONSULTATION_URL: Record<'SP' | 'RJ', string> = {
   SP: 'https://www.nfce.fazenda.sp.gov.br/NFCeConsultaPublica/Paginas/ConsultaPublica.aspx',
-  RJ: 'https://www4.fazenda.rj.gov.br/consultaNFCe/consulta',
+  RJ: 'https://www.fazenda.rj.gov.br/nfce/consulta',
 };
 
 const decodeHtml = (value: string) => value
@@ -62,7 +63,7 @@ const consultByKey = async (key: string, state: 'SP' | 'RJ') => {
     if (attributes.name && attributes.type === 'hidden') fields.set(attributes.name, attributes.value || '');
   }
 
-  const keyField = (initialHtml.match(/<input\b[^>]*(?:name|id)=["'][^"']*(?:chave|acesso)[^"']*["'][^>]*>/i) ?? []).map(inputAttributes)[0];
+  const keyField = (initialHtml.match(/<input\b[^>]*(?:name|id)=["'][^"']*(?:chave|acesso|chnfe)[^"']*["'][^>]*>/i) ?? []).map(inputAttributes)[0];
   if (!keyField?.name) throw new Error(`A SEFAZ-${state} não disponibilizou o formulário de consulta por chave.`);
   fields.set(keyField.name, key);
 
