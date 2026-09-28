@@ -288,13 +288,19 @@ export const ReceiptsModule: React.FC = () => {
 
               <div>
                 <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">Chave de Acesso (Opcional)</label>
-                <input
-                  type="text"
-                  value={accessKey}
-                  onChange={(e) => setAccessKey(e.target.value)}
-                  placeholder="432409..."
-                  className="w-full px-3.5 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-green-500 text-sm font-mono"
-                />
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={accessKey}
+                    onChange={(e) => setAccessKey(e.target.value)}
+                    placeholder="Chave NFC-e de 44 dígitos"
+                    className="min-w-0 flex-1 px-3.5 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-green-500 text-sm font-mono"
+                  />
+                  <button type="button" onClick={handleConsultAccessKey} disabled={isConsulting} className="px-3 py-2 rounded-xl bg-slate-800 text-white text-xs font-semibold hover:bg-slate-900 disabled:opacity-50">
+                    Consultar chave
+                  </button>
+                </div>
+                <p className="mt-1 text-[11px] text-slate-500">Disponível para NFC-e de SP (início 35) e RJ (início 33).</p>
               </div>
 
               <div>
