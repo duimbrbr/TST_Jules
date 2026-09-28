@@ -12,15 +12,7 @@ export interface SefazReceiptLookup {
 }
 
 export const consultSefazReceipt = async (qrCodeUrl: string): Promise<SefazReceiptLookup> => {
-  return requestSefazReceipt('url', qrCodeUrl);
-};
-
-export const consultSefazReceiptByKey = async (accessKey: string): Promise<SefazReceiptLookup> => {
-  return requestSefazReceipt('key', accessKey);
-};
-
-const requestSefazReceipt = async (parameter: 'url' | 'key', value: string): Promise<SefazReceiptLookup> => {
-  const response = await fetch(`/api/sefaz?${parameter}=${encodeURIComponent(value)}`);
+  const response = await fetch(`/api/sefaz?url=${encodeURIComponent(qrCodeUrl)}`);
   const payload: unknown = await response.json();
   const data = payload as Partial<SefazReceiptLookup> & { message?: string };
 

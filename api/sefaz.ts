@@ -10,12 +10,6 @@ const SUPPORTED_HOSTS = new Set([
   'www4.fazenda.rj.gov.br',
 ]);
 
-const STATE_BY_KEY_PREFIX: Record<string, 'SP' | 'RJ'> = { '35': 'SP', '33': 'RJ' };
-const KEY_CONSULTATION_URL: Record<'SP' | 'RJ', string> = {
-  SP: 'https://www.nfce.fazenda.sp.gov.br/NFCeConsultaPublica/Paginas/ConsultaPublica.aspx',
-  RJ: 'https://www4.fazenda.rj.gov.br/consultaNFCe/consulta',
-};
-
 const decodeHtml = (value: string) => value
   .replace(/&nbsp;/gi, ' ')
   .replace(/&amp;/gi, '&')
@@ -48,67 +42,15 @@ const extractTotal = (html: string) => {
   return match ? parseNumber(match[1]) : undefined;
 };
 
-const inputAttributes = (tag: string) => Object.fromEntries([...tag.matchAll(/([\w$-]+)=["']([^"']*)["']/g)].map(([, key, value]) => [key.toLowerCase(), decodeHtml(value)]));
-
-const consultByKey = async (key: string, state: 'SP' | 'RJ') => {
-  const consultationUrl = KEY_CONSULTATION_URL[state];
-  const initialResponse = await fetch(consultationUrl, { headers: { Accept: 'text/html,application/xhtml+xml' } });
-  if (!initialResponse.ok) throw new Error(`A página de consulta da SEFAZ-${state} respondeu com status ${initialResponse.status}.`);
-
-  const initialHtml = await initialResponse.text();
-  const fields = new URLSearchParams();
-  for (const tag of initialHtml.match(/<input\b[^>]*>/gi) ?? []) {
-    const attributes = inputAttributes(tag);
-    if (attributes.name && attributes.type === 'hidden') fields.set(attributes.name, attributes.value || '');
-  }
-
-  const keyField = (initialHtml.match(/<input\b[^>]*(?:name|id)=["'][^"']*(?:chave|acesso)[^"']*["'][^>]*>/i) ?? []).map(inputAttributes)[0];
-  if (!keyField?.name) throw new Error(`A SEFAZ-${state} não disponibilizou o formulário de consulta por chave.`);
-  fields.set(keyField.name, key);
-
-  const submitField = (initialHtml.match(/<input\b[^>]*type=["']submit["'][^>]*>/i) ?? []).map(inputAttributes)[0];
-  if (submitField?.name) fields.set(submitField.name, submitField.value || 'Consultar');
-
-  const response = await fetch(consultationUrl, {
-    method: 'POST',
-    headers: { Accept: 'text/html,application/xhtml+xml', 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: fields.toString(),
-  });
-  if (!response.ok) throw new Error(`A SEFAZ-${state} respondeu com status ${response.status}.`);
-  return { html: await response.text(), state };
-};
-
-export default async function handler(req: { method?: string; query: { url?: string | string[]; key?: string | string[] } }, res: { status: (status: number) => { json: (body: unknown) => void } }) {
+export default async function handler(req: { method?: string; query: { url?: string | string[] } }, res: { status: (status: number) => { json: (body: unknown) => void } }) {
   if (req.method !== 'GET') return res.status(405).json({ message: 'Método não permitido.' });
 
   const rawUrl = Array.isArray(req.query.url) ? req.query.url[0] : req.query.url;
-  const rawKey = Array.isArray(req.query.key) ? req.query.key[0] : req.query.key;
-  if (!rawUrl && !rawKey) return res.status(400).json({ message: 'Informe a URL do QR Code ou a chave de acesso da NFC-e.' });
-
-  if (rawKey) {
-    const key = rawKey.replace(/\D/g, '');
-    const state = STATE_BY_KEY_PREFIX[key.slice(0, 2)];
-    if (key.length !== 44 || !state) return res.status(400).json({ message: 'Informe uma chave de 44 dígitos de uma NFC-e de SP ou RJ.' });
-
-    try {
-      const { html } = await consultByKey(key, state);
-      if (/captcha|acesso negado|não autorizado|access denied/i.test(html)) {
-        return res.status(502).json({ message: `A consulta por chave da SEFAZ-${state} exige validação no portal oficial.` });
-      }
-      const items = parseItems(html);
-      const totalAmount = extractTotal(html) ?? items.reduce((total, item) => total + item.total_price, 0);
-      if (!items.length) return res.status(422).json({ message: `A SEFAZ-${state} não disponibilizou itens legíveis para esta chave. Confira os dados no portal oficial e preencha-os manualmente.` });
-      return res.status(200).json({ state, items, totalAmount });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : `Não foi possível consultar a SEFAZ-${state}.`;
-      console.error('SEFAZ key consultation failed:', error);
-      return res.status(502).json({ message });
-    }
-  }
+  if (!rawUrl) return res.status(400).json({ message: 'Informe a URL do QR Code da NFC-e.' });
 
   let url: URL;
   try {
-    url = new URL(rawUrl!);
+    url = new URL(rawUrl);
   } catch {
     return res.status(400).json({ message: 'URL da NFC-e inválida.' });
   }
