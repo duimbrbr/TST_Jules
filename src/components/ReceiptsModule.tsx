@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Receipt, ReceiptItem, Store } from '../types';
 import { SupabaseData } from '../lib/supabaseData';
 import { BarcodeScannerModal } from './BarcodeScannerModal';
-import { QrCode, Plus, Calendar } from 'lucide-react';
+import { consultSefazReceipt, consultSefazReceiptByKey, SefazReceiptLookup } from '../services/sefazService';
+import { QrCode, Plus, Calendar, Loader2, AlertCircle } from 'lucide-react';
 
 export const ReceiptsModule: React.FC = () => {
   const [receipts, setReceipts] = useState<Receipt[]>([]);
@@ -18,6 +19,9 @@ export const ReceiptsModule: React.FC = () => {
   const [totalAmount, setTotalAmount] = useState('');
   const [accessKey, setAccessKey] = useState('');
   const [itemsText, setItemsText] = useState('');
+  const [receiptState, setReceiptState] = useState('RS');
+  const [isConsulting, setIsConsulting] = useState(false);
+  const [consultationMessage, setConsultationMessage] = useState<string | null>(null);
 
   const loadData = async () => {
     const fetchedReceipts = await SupabaseData.getReceipts();
@@ -34,12 +38,45 @@ export const ReceiptsModule: React.FC = () => {
     setScannedUrl(url);
     const match = url.match(/p=([0-9]{44})/);
     setAccessKey(match?.[1] || (/^\d{44}$/.test(url) ? url : ''));
-    setShowManualModal(true);
   };
 
-  const handleScanNFCe = (scannedCode: string) => {
+  const handleScanNFCe = async (scannedCode: string) => {
     setShowScanner(false);
     parseSefazUrl(scannedCode);
+    await consultReceipt(() => consultSefazReceipt(scannedCode));
+  };
+
+  const applyConsultedReceipt = (receipt: SefazReceiptLookup) => {
+    setReceiptState(receipt.state);
+    setTotalAmount(receipt.totalAmount.toFixed(2));
+    setItemsText(receipt.items.map((item) => (
+      `${item.product_name} | ${item.quantity} | ${item.unit_price.toFixed(2)}`
+    )).join('\n'));
+    setConsultationMessage(`Nota consultada com sucesso na SEFAZ-${receipt.state}. Confira os dados antes de salvar.`);
+  };
+
+  const consultReceipt = async (lookup: () => Promise<SefazReceiptLookup>) => {
+    setConsultationMessage(null);
+    setIsConsulting(true);
+
+    try {
+      applyConsultedReceipt(await lookup());
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Não foi possível consultar a NFC-e na SEFAZ.';
+      setConsultationMessage(message);
+    } finally {
+      setIsConsulting(false);
+      setShowManualModal(true);
+    }
+  };
+
+  const handleConsultAccessKey = async () => {
+    const key = accessKey.replace(/\D/g, '');
+    if (key.length !== 44) {
+      setConsultationMessage('Digite uma chave de acesso NFC-e válida, com 44 dígitos, para consultar a SEFAZ.');
+      return;
+    }
+    await consultReceipt(() => consultSefazReceiptByKey(key));
   };
 
   const handleManualReceipt = async (e: React.FormEvent) => {
@@ -77,25 +114,26 @@ export const ReceiptsModule: React.FC = () => {
       access_key: accessKey || `43240${Math.floor(Math.random() * 100000000000000)}`,
       total_amount: calculatedTotal,
       issue_date: new Date().toISOString(),
-      state: 'RS',
-      items: parsedItems.length > 0 ? parsedItems : [
-        { id: `ri-${Date.now()}-1`, product_name: 'Gêneros Alimentícios', quantity: 1, unit_price: parseFloat(totalAmount), total_price: parseFloat(totalAmount) }
-      ],
+      state: receiptState,
+      items: parsedItems,
     });
 
     await loadData();
     setShowManualModal(false);
     setTotalAmount('');
     setItemsText('');
+    setScannedUrl('');
+    setConsultationMessage(null);
+    setReceiptState('RS');
   };
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-slate-800">Notas Fiscais (NFC-e RS)</h2>
+          <h2 className="text-2xl font-bold text-slate-800">Notas Fiscais (NFC-e SP e RJ)</h2>
           <p className="text-sm text-slate-500">
-            Escaneie o QR Code para preencher a chave de acesso e confira os dados antes de registrar a nota manualmente.
+            Escaneie o QR Code oficial para consultar os itens na SEFAZ de São Paulo ou Rio de Janeiro antes de registrar a nota.
           </p>
         </div>
 
@@ -212,7 +250,19 @@ export const ReceiptsModule: React.FC = () => {
         <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
             <h3 className="text-xl font-bold text-slate-800">Lançamento Manual de Nota Fiscal</h3>
-            {scannedUrl && <p className="text-xs text-slate-500">QR Code lido. Confira os dados antes de salvar; a consulta automática à SEFAZ não é realizada pelo navegador.</p>}
+            {isConsulting && (
+              <div className="flex items-center gap-2 text-xs text-slate-600 bg-slate-50 rounded-xl p-3">
+                <Loader2 className="w-4 h-4 animate-spin text-green-600" />
+                Consultando a SEFAZ…
+              </div>
+            )}
+            {consultationMessage && (
+              <div className={`flex items-start gap-2 text-xs rounded-xl p-3 ${consultationMessage.startsWith('Nota consultada') ? 'bg-green-50 text-green-800' : 'bg-amber-50 text-amber-800'}`}>
+                <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                <span>{consultationMessage}</span>
+              </div>
+            )}
+            {scannedUrl && <p className="text-xs text-slate-500">QR Code lido. Os dados exibidos foram consultados no portal estadual quando disponíveis; confira-os antes de salvar.</p>}
 
             <form onSubmit={handleManualReceipt} className="space-y-4">
               <div>
@@ -244,14 +294,29 @@ export const ReceiptsModule: React.FC = () => {
               </div>
 
               <div>
+                <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">UF da Nota</label>
+                <select value={receiptState} onChange={(e) => setReceiptState(e.target.value)} className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-green-500 text-sm bg-white">
+                  <option value="SP">São Paulo</option>
+                  <option value="RJ">Rio de Janeiro</option>
+                  <option value="RS">Outro / lançamento manual</option>
+                </select>
+              </div>
+
+              <div>
                 <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">Chave de Acesso (Opcional)</label>
-                <input
-                  type="text"
-                  value={accessKey}
-                  onChange={(e) => setAccessKey(e.target.value)}
-                  placeholder="432409..."
-                  className="w-full px-3.5 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-green-500 text-sm font-mono"
-                />
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={accessKey}
+                    onChange={(e) => setAccessKey(e.target.value)}
+                    placeholder="Chave NFC-e de 44 dígitos"
+                    className="min-w-0 flex-1 px-3.5 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-green-500 text-sm font-mono"
+                  />
+                  <button type="button" onClick={handleConsultAccessKey} disabled={isConsulting} className="px-3 py-2 rounded-xl bg-slate-800 text-white text-xs font-semibold hover:bg-slate-900 disabled:opacity-50">
+                    Consultar chave
+                  </button>
+                </div>
+                <p className="mt-1 text-[11px] text-slate-500">Disponível para NFC-e de SP (início 35) e RJ (início 33).</p>
               </div>
 
               <div>
@@ -276,7 +341,8 @@ export const ReceiptsModule: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-green-600 text-white text-sm font-medium hover:bg-green-700 shadow-sm"
+                  disabled={isConsulting}
+                  className="px-5 py-2 rounded-xl bg-green-600 text-white text-sm font-medium hover:bg-green-700 shadow-sm disabled:opacity-50"
                 >
                   Salvar Nota
                 </button>
